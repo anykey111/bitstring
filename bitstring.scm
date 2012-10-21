@@ -299,7 +299,7 @@
 (define (bitstring-of-any x)
   (cond
     ((bitstring? x)
-      x) ;FIXME: make copy of x
+      (bitstring-share x (bitstring-offset x) (bitstring-numbits x)))
     ((u8vector? x)
       (bitstring-of-u8vector x))
     ((string? x)
