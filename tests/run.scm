@@ -2,12 +2,37 @@
 
 (use bitstring test)
 
-(print (bitconstruct
-    	((1)(2)(3))
-    	(else #f)))
+(test-begin "append")
+; append aligned
+(define bs (bitstring-create))
+(bitstring-append bs (bitstring-of-any "A"))
+(bitstring-append bs (bitstring-of-any "B"))
+(bitstring-append bs (bitstring-of-any "\x20"))
+(test #t (bitstring-compare bs (bitstring-of-any "AB\x20")))
+; append unaligned
+(define bs (bitstring-create))
+(bitstring-append bs (integer->bitstring-big #b100 3))
+(bitstring-append bs (integer->bitstring-big #b10 2))
+(bitstring-append bs (integer->bitstring-big #b1 1))
+(bitstring-append bs (integer->bitstring-big #b0101 4))
+(bitstring-append bs (integer->bitstring-big #b10 2))
+(bitstring-append bs (integer->bitstring-big #b0 1))
+(bitstring-append bs (integer->bitstring-big #b10100 5))
+(test #b100101010110010100 (bitstring->integer-big bs))
+; append unaligned with overflow
+(define bs (bitstring-create))
+(bitstring-append bs (integer->bitstring-big #b100111010 9))
+(bitstring-append bs (integer->bitstring-big #b1000111100100 13))
+(test #b1001110101000111100100 (bitstring->integer-big bs))
+(define bs (bitstring-create))
+(bitstring-append bs (integer->bitstring-big #b0 1))
+(bitstring-append bs (integer->bitstring-big #b01001011011101 14))
+(bitstring-append bs (integer->bitstring-big #b110001 6))
+(bitstring-append bs (integer->bitstring-big #b10100011100 11))
+(test #b00100101101110111000110100011100 (bitstring->integer-big bs))
+(test-end)
 
 (exit)
-
 (test-begin "bitpacket")
 (bitpacket Packet1 (1) (2))
 (bitpacket Packet2 (A 8) (B))

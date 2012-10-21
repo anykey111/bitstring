@@ -47,6 +47,8 @@
    bitstring-read
    bitstring-share
    bitstring-compare
+   bitstring-append 
+   bitstring-create
    bitstring->list
    bitstring->integer-big
    bitstring->integer-little
@@ -230,7 +232,7 @@
   (syntax-rules ()
     ((_ "constructing" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
-      	;(bitstring-append stream tmp)
+      	(bitstring-append stream tmp)
       	continuation))
     ((_ "matching" stream name continuation) ; read all rest bytes
       (symbol?? name
@@ -524,6 +526,40 @@
       	(bitstring-offset-set! bs to)
       	shared)
       #f)))
+
+; create empty bitstring and reserve 16 bytes
+(define (bitstring-create)
+  (let ((tmp (bitstring-of-u8vector (make-u8vector 16 0))))
+    (bitstring-numbits-set! tmp 0)
+    tmp))
+
+(define (bitstring-append dest src)
+  ; need ensure that dest buffer long enough
+  (bitstring-fold
+    (lambda (offset nbits byte acc)
+      (bitstring-append-safe acc byte nbits))
+    dest
+    src))
+
+(define (bitstring-append-safe bs byte nbits)
+  (let* ((position (bitstring-numbits bs))
+         (index (quotient position 8))
+         (drift (remainder position 8)))
+    (if (zero? drift) 
+      ; store aligned
+      (begin
+      	(bitstring-store-byte bs index byte)
+      	(bitstring-numbits-set! bs (+ position nbits)))
+      ; store unaligned
+      (let ((byte-src (bitstring-load-byte bs index))
+      	    (byte-dst (arithmetic-shift byte (- drift)))
+      	    (restbits (- 8 drift)))
+      	(bitstring-store-byte bs index (bitwise-ior byte-src byte-dst))
+      	; store rest bits if didnt fit in current byte
+      	(if (< restbits nbits)
+      	  (bitstring-store-byte bs (+ index 1) (arithmetic-shift byte restbits)))
+      	(bitstring-numbits-set! bs (+ position nbits))))
+    bs));return bitstring
 
 );module
 
