@@ -5,10 +5,15 @@
 (test-begin "bitpacket")
 (bitpacket Packet1 (1) (2))
 (bitpacket Packet2 (A 8) (B))
-
 (test 3 (bitmatch `#(1 2 3) (((Packet1 bitpacket) (C 8)) C)))
 (test 6 (bitmatch `#(1 2 3) (((Packet2 bitpacket) (C 8)) (+ A B C))))
 (test-error (bitmatch `#(1 2 3) (((Packet1 bitpacket) (C 8) (D 8)) C)))
+
+(bitpacket PacketC (C 8))
+(bitpacket PacketB (B 8))
+(bitpacket PacketA (A 8) (PacketB bitpacket) (PacketC bitpacket))
+(test 6 (bitmatch `#(1 2 3) (( (PacketA bitpacket) ) (+ A B C))))
+
 (test-end)
 
 ;(test-begin "string")
