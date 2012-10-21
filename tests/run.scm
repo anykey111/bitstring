@@ -82,7 +82,15 @@
 (bitmatch `#( 5 1 2 3 4 5)
   (((count 8) (rest (* count 8) bitstring))
     (print " count=" count " rest=" (bitstring-length rest))))
-    
+
+(test-begin "short form")
+(bitpacket B30 (30))
+(test 'yes (bitmatch `#( 10 20 30 )
+    ((10) (20) (11) -> 'no)
+    ((10) (20) (33) -> 'no)
+    ((10) (20) (B30 bitpacket) -> 'yes)))
+(test-end)
+
 (test-begin "match")
 
 (test 1.5

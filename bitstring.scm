@@ -107,11 +107,15 @@
 	  (or (bitstring-constructor (':secret ':matching value return) patterns ...)))))))
 
 (define-syntax bitstring-constructor
-  (syntax-rules (else) 
+  (syntax-rules (else ->) 
     ((_ (':secret ':matching value return))
       (abort (list 'bitstring-match-failure)))
     ((_ (':secret ':matching value return) (else expression))
       (return expression))
+    ((_ (':secret ':matching value return) (pattern ... -> expression) rest ...)
+      ; short form
+      (bitstring-constructor
+      	(':secret ':matching value return) ((pattern ...) expression) rest ...))
     ((_ (':secret ':matching value return) ((pattern ...) expression) rest ...)
       (or
       	(let ((stream (bitstring-of-any value)))
