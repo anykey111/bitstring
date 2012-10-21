@@ -1,0 +1,7 @@
+((license "BSD")
+(category data)
+(needs)
+(test-depends test)
+(author "rivo")
+(synopsis "Binary pattern matching."))
+

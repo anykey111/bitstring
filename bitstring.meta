@@ -1,0 +1,9 @@
+((files "bitstring.setup" "bitstring.release-info" "bitstring.meta"
+        "bitstring.scm" "tests/run.scm")
+ (license "BSD")
+ (category web)
+ (depends)
+ (test-depends test)
+ (doc-from-wiki)
+ (author "rivo")
+ (synopsis "Binary pattern matching"))
