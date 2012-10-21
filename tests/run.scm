@@ -2,6 +2,12 @@
 
 (use bitstring test)
 
+(print (bitconstruct
+    	((1)(2)(3))
+    	(else #f)))
+
+(exit)
+
 (test-begin "bitpacket")
 (bitpacket Packet1 (1) (2))
 (bitpacket Packet2 (A 8) (B))

@@ -38,6 +38,7 @@
 (module bitstring
   (bitmatch
    bitpacket
+   bitconstruct
    bitstring-pattern-continue
    make-bitstring
    bitstring-length
@@ -104,24 +105,43 @@
     ((_ value patterns ...)
       (call-with-current-continuation
 	(lambda (return)
-	  (or (bitstring-constructor (':secret ':matching value return) patterns ...)))))))
+	  (or (bitstring-constructor (':secret "matching" value return) patterns ...)))))))
+
+(define-syntax bitconstruct
+  (syntax-rules ()
+    ((_ patterns ...)
+      (call-with-current-continuation
+	(lambda (return)
+	  (or (bitstring-constructor (':secret "constructing" return) patterns ...)))))))
 
 (define-syntax bitstring-constructor
-  (syntax-rules (else ->) 
-    ((_ (':secret ':matching value return))
+  (syntax-rules (else ->)
+    ;; constructing syntax
+    ((_ (':secret "constructing" return))
       (abort (list 'bitstring-match-failure)))
-    ((_ (':secret ':matching value return) (else expression))
+    ((_ (':secret "constructing" return) (else expression))
       (return expression))
-    ((_ (':secret ':matching value return) (pattern ... -> expression) rest ...)
+    ((_ (':secret "constructing" return) (pattern ...) rest ...)
+      (or
+      	(let ((stream (bitstring-of-any (make-u8vector 16 0))))
+      	  ;(print "group: " `(pattern ...))
+      	  (bitstring-pattern (':secret "constructing" stream (return stream)) pattern ...))
+      	(bitstring-constructor (':secret "constructing" return) rest ...)))
+    ;; matching syntax
+    ((_ (':secret "matching" value return))
+      (abort (list 'bitstring-match-failure)))
+    ((_ (':secret "matching" value return) (else expression))
+      (return expression))
+    ((_ (':secret "matching" value return) (pattern ... -> expression) rest ...)
       ; short form
       (bitstring-constructor
-      	(':secret ':matching value return) ((pattern ...) expression) rest ...))
-    ((_ (':secret ':matching value return) ((pattern ...) expression) rest ...)
+      	(':secret "matching" value return) ((pattern ...) expression) rest ...))
+    ((_ (':secret "matching" value return) ((pattern ...) expression) rest ...)
       (or
       	(let ((stream (bitstring-of-any value)))
       	  ;(print "group: " `(pattern ...))
-      	  (bitstring-pattern (':secret ':matching stream (return expression)) pattern ...))
-      	(bitstring-constructor (':secret ':matching value return) rest ...)))))
+      	  (bitstring-pattern (':secret "matching" stream (return expression)) pattern ...))
+      	(bitstring-constructor (':secret "matching" value return) rest ...)))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
@@ -138,10 +158,12 @@
 (define-syntax bitstring-pattern
   (syntax-rules (big little bitstring check float bitpacket)
     ;user handler
-    ((_ (':secret mode stream handler))
-      (cond
+    ((_ (':secret "constructing" stream handler))
+      handler)
+    ((_ (':secret "matching" stream handler))
+      (cond  ; ensure that no more bits left
       	((zero? (bitstring-length stream))
-      	  handler)
+      	  handler) 
       	(else
       	  #f)))
     ; zero-length bitstring
@@ -206,13 +228,17 @@
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
-    ((_ ':matching stream name continuation) ; read all rest bytes
+    ((_ "constructing" stream name bits type continuation)
+      (and-let* ((tmp (bitstring-write-expand name bits type)))
+      	;(bitstring-append stream tmp)
+      	continuation))
+    ((_ "matching" stream name continuation) ; read all rest bytes
       (symbol?? name
       	(and-let* ((bits (bitstring-length stream))
       	           (name (bitstring-read stream bits)))
       	  continuation)
       	(abort (list 'bitstring-invalid-value `(name)))))
-    ((_ ':matching stream name bits type continuation)
+    ((_ "matching" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
@@ -222,11 +248,8 @@
       	           (value (bitstring-write-expand name bits type)))
       	  (and
       	    (bitstring-compare tmp value)
-      	    continuation)))) 
-    ((_ ':constructing stream name bits type continuation)
-      (and-let* ((tmp (bitstring-write-expand name bits type)))
-      	(bitstring-append stream tmp)
-      	continuation))))
+      	    continuation))))))
+    
 
 (define-syntax bitstring-read-expand
   (syntax-rules (big little bitstring float)
