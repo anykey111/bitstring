@@ -1,3 +1,12 @@
-(repo hg "https://bitbucket.org/rivo/{egg-name}")
-(uri targz "https://bitbucket.org/rivo/{egg-name}/get/tip.tar.gz")
-(release "0.1")
+(compile -s -O2 -d1 bitstring.scm -j bitstring)
+
+(install-extension
+  'bitstring
+  '("bitstring.so")
+  ; Assoc list with properties for your extension:
+  '((version "0.1") ;; version number should be a string
+  ))
+
+;(repo hg "https://bitbucket.org/rivo/{egg-name}")
+;(uri targz "https://bitbucket.org/rivo/{egg-name}/get/tip.tar.gz")
+;(release "0.1")
