@@ -16,16 +16,17 @@
 
 (test-end)
 
-;(test-begin "string")
-;(test 'ok (bitmatch "ABC" ((("A") (66) (#\C)) 'ok)))
-;(test 'ok (bitmatch "ABC" ((("AB") (#\C)) 'ok)))
-;(test-end)
-;(test-begin "vector")
-;(test 'ok (bitmatch `#( 65 66 67 ) (("A") (66) (#\C) -> 'ok)))
-;(test-end)
-;(test-begin "u8vector")
-;(test 'ok (bitmatch `#u8( 65 66 67 ) (("A") (66) (#\C) -> 'ok)))
-;(test-end)
+(test-begin "string")
+(test 'ok (bitmatch "ABC" ((("A") (66) (#\C)) 'ok)))
+(test 'ok (bitmatch "ABC" ((("AB") (#\C)) 'ok)))
+(test-end)
+
+(test-begin "vector")
+(test 'ok (bitmatch `#( 65 66 67 ) ( (("A") (66) (#\C)) 'ok)))
+(test-end)
+(test-begin "u8vector")
+(test 'ok (bitmatch `#u8( 65 66 67 ) ((("A") (66) (#\C)) 'ok)))
+(test-end)
 
 (bitpacket IPAddress (a 8) (b 8) (c 8) (d 8))
 

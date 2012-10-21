@@ -69,6 +69,23 @@
       	     (no (caddr args)))
       	(if (symbol? name) yes no)))))
 
+(define-syntax value-type??
+  (er-macro-transformer
+    (lambda (e r c)
+      (let* ((args (cdr e))
+      	     (name (car args)))
+      	(cond
+      	  ((integer? name)
+      	    #\I)
+      	  ((char? name)
+      	    #\C)
+      	  ((string? name)
+      	    #\S)
+      	  ((symbol? name)
+      	    #\X)
+      	  (else
+      	    #\?))))))
+
 (define-syntax bitpacket
   (syntax-rules ()
     ((_ name fields ...)
@@ -94,7 +111,7 @@
     ((_ (':secret ':matching value return))
       (abort (list 'bitstring-match-failure)))
     ((_ (':secret ':matching value return) (else expression))
-      (begin (print "else case") (return expression)))
+      (return expression))
     ((_ (':secret ':matching value return) ((pattern ...) expression) rest ...)
       (or
       	(let ((stream (bitstring-of-any value)))
@@ -120,7 +137,6 @@
     ((_ (':secret mode stream handler))
       (cond
       	((zero? (bitstring-length stream))
-      	  (print (bitstring-length stream))
       	  handler)
       	(else
       	  #f)))
@@ -158,10 +174,27 @@
     ; rewrite by default to (NAME BITS big)
     ((_ (':secret mode stream handler) (NAME BITS) rest ...)
       (bitstring-pattern (':secret mode stream handler) (NAME BITS big) rest ...))
+    ; rewrite immidiate value
     ((_ (':secret mode stream handler) (NAME) rest ...)
-      (bitstring-pattern (':secret mode stream handler) (NAME 8 big) rest ...))
+      (bitstring-pattern (':secret mode stream handler) NAME rest ...))
     ((_ (':secret mode stream handler) NAME rest ...)
-      (bitstring-pattern (':secret mode stream handler) (NAME 8 big) rest ...))))
+      (case (value-type?? NAME)
+      	((#\I)
+      	  (bitstring-pattern (':secret mode stream handler)
+      	                     (NAME 8 big) rest ...))
+      	((#\X)
+      	  (bitstring-pattern (':secret mode stream handler)
+      	                     (NAME 8 big) rest ...))
+      	((#\C)
+      	  (bitstring-pattern (':secret mode stream handler)
+      	                     ((char->integer NAME) 8 big) rest ...))
+      	((#\S)
+      	  (let* ((tmp (bitstring-of-any NAME))
+      	  	 (bits (bitstring-length tmp)))
+      	    (bitstring-pattern (':secret mode stream handler)
+      	                       (tmp bits bitstring) rest ...)))
+      	(else
+      	  (error "bitstring-immidiate-value"))))))
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
