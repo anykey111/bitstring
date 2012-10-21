@@ -2,6 +2,18 @@
 
 (use bitstring test)
 
+(bitpacket Packet1 (1) (2))
+(bitpacket Packet2 (A 8) (B))
+
+; this work
+(bitmatch `#(1 2 3)
+  (((Packet1 bitpacket) (C 8)) (print "C=" C)))
+
+; doesnt work
+(bitmatch `#(1 2 3)
+  (((Packet2 bitpacket) (C 8)) (print "A=" A)))
+
+
 ;(test-begin "string")
 ;(test 'ok (bitmatch "ABC" ((("A") (66) (#\C)) 'ok)))
 ;(test 'ok (bitmatch "ABC" ((("AB") (#\C)) 'ok)))

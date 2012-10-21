@@ -11,6 +11,7 @@
 ;;   ...
 ;;   (else expression))
 ;;
+;; (bitpacket NAME pattern ...)
 ;;
 ;; Notes:
 ;; - else block is optional.
@@ -22,6 +23,7 @@
 ;;
 ;; pattern:
 ;; (NAME)
+;; (NAME bitpacket)
 ;; (NAME bitstring)
 ;; (NAME BITS)
 ;; (NAME BITS big)
@@ -30,9 +32,13 @@
 ;; (NAME BITS bitstring)
 ;; (check EXPRESSION)
 ;;
+;;
+;;
 
 (module bitstring
   (bitmatch
+   bitpacket
+   bitstring-pattern
    make-bitstring
    bitstring-length
    bitstring-of-any
@@ -54,18 +60,27 @@
   (import scheme chicken extras srfi-4)
   (use srfi-4)
 
-;; ninjutsu macro
 (define-syntax symbol??
-       (syntax-rules ()
-         ((_ (x . y) kt kf) kf)       ; It's a pair, not a symbol
-         ((_ #(x ...) kt kf) kf)      ; It's a vector, not a symbol
-         ((_ maybe-symbol kt kf)
-           (let-syntax
-             ((test
-                (syntax-rules ()
-                  ((test maybe-symbol t f) t)
-                  ((test x t f) f))))
-             (test abracadabra kt kf)))))
+  (er-macro-transformer
+    (lambda (e r c)
+      (let* ((args (cdr e))
+      	     (name (car args))
+      	     (yes (cadr args))
+      	     (no (caddr args)))
+      	(if (symbol? name) yes no)))))
+
+(define-syntax bitpacket
+  (syntax-rules ()
+    ((_ name fields ...)
+      (define-syntax name
+      	(er-macro-transformer
+      	  ;; (name context args ...)
+      	  (lambda (e r c)
+      	    (let ((context (cadr e))
+      	    	  (args (caddr e)))
+      	      ;; inline packet fields
+      	      `(bitstring-pattern ,context fields ... ,args)))
+      	  )))))
 
 (define-syntax bitmatch
   (syntax-rules ()
@@ -83,21 +98,28 @@
     ((_ (':secret ':matching value return) ((pattern ...) expression) rest ...)
       (or
       	(let ((stream (bitstring-of-any value)))
-      	  (print "group: " `(pattern ...))
+      	  ;(print "group: " `(pattern ...))
       	  (bitstring-pattern (':secret ':matching stream (return expression)) pattern ...))
       	(bitstring-constructor (':secret ':matching value return) rest ...)))))
 
+(define-syntax bitstring-packet-expand
+  (syntax-rules ()
+    ((_ mode stream handler name rest ...)
+      (name (':secret mode stream handler) rest ...))))
+
 (define-syntax bitstring-pattern
-  (syntax-rules (big little bitstring check float)
+  (syntax-rules (big little bitstring check float bitpacket)
     ;user handler
     ((_ (':secret mode stream handler))
-      (begin (print "user handler") handler))
+      handler)
     ; user guard expression
     ((_ (':secret mode stream handler) (check condition) rest ...)
       (and
-      	(begin (print "test codition: " `(condition) " = " condition))
       	condition
       	(bitstring-pattern (':secret mode stream handler) rest ...)))
+    ; packet
+    ((_ (':secret mode stream handler) (NAME bitpacket) rest ...)
+      (bitstring-packet-expand mode stream handler NAME rest ...))
     ; greedy bitstring
     ((_ (':secret mode stream handler) (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME
@@ -138,7 +160,7 @@
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  (print "expand: " `(name bits type))
+      	  ;(print "expand: " `(name bits type))
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
@@ -240,7 +262,7 @@
 
 (define (bitstring-compare a b)
   (and
-    (begin (print "bitstring-compare:" a b) #t)
+    ;(begin (print "bitstring-compare:" a b) #t)
     (= (bitstring-length a) (bitstring-length b))
     (equal? (bitstring->list a) (bitstring->list b))))
 
