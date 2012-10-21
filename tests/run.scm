@@ -2,17 +2,14 @@
 
 (use bitstring test)
 
+(test-begin "bitpacket")
 (bitpacket Packet1 (1) (2))
 (bitpacket Packet2 (A 8) (B))
 
-; this work
-(bitmatch `#(1 2 3)
-  (((Packet1 bitpacket) (C 8)) (print "C=" C)))
-
-; doesnt work
-(bitmatch `#(1 2 3)
-  (((Packet2 bitpacket) (C 8)) (print "A=" A)))
-
+(test 3 (bitmatch `#(1 2 3) (((Packet1 bitpacket) (C 8)) C)))
+(test 6 (bitmatch `#(1 2 3) (((Packet2 bitpacket) (C 8)) (+ A B C))))
+(test-error (bitmatch `#(1 2 3) (((Packet1 bitpacket) (C 8) (D 8)) C)))
+(test-end)
 
 ;(test-begin "string")
 ;(test 'ok (bitmatch "ABC" ((("A") (66) (#\C)) 'ok)))
@@ -24,6 +21,8 @@
 ;(test-begin "u8vector")
 ;(test 'ok (bitmatch `#u8( 65 66 67 ) (("A") (66) (#\C) -> 'ok)))
 ;(test-end)
+
+(bitpacket IPAddress (a 8) (b 8) (c 8) (d 8))
 
 (bitmatch `#( #x45 #x00 #x00 #x6c #x92 #xcc #x00 #x00
               #x38 #x06 #x00 #x00 #x92 #x95 #xba #x14 #xa9 #x7c #x15 #x95 )
@@ -58,7 +57,7 @@
 		      	  ((17) "UDP")))
       (print "CheckSum " (sprintf "~X" CheckSum))
       (print "SourceAddr " (bitmatch SourceAddr
-      	  		     (((a 8)(b 8)(c 8)(d 8))
+      	  		     (( (IPAddress bitpacket) )
       	  			(sprintf "~A.~A.~A.~A" a b c d))))
       (print "DestinationAddr " (bitmatch DestinationAddr
       	  	                   (((a)(b)(c)(d))

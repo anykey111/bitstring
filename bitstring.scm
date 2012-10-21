@@ -38,7 +38,7 @@
 (module bitstring
   (bitmatch
    bitpacket
-   bitstring-pattern
+   bitstring-pattern-continue
    make-bitstring
    bitstring-length
    bitstring-of-any
@@ -77,9 +77,9 @@
       	  ;; (name context args ...)
       	  (lambda (e r c)
       	    (let ((context (cadr e))
-      	    	  (args (caddr e)))
+      	    	  (args (cddr e)))
       	      ;; inline packet fields
-      	      `(bitstring-pattern ,context fields ... ,args)))
+      	      `(bitstring-pattern-continue ,context (fields ...) ,args)))
       	  )))))
 
 (define-syntax bitmatch
@@ -104,22 +104,37 @@
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
+    ((_ mode stream handler name)
+      (name (':secret mode stream handler)))
     ((_ mode stream handler name rest ...)
       (name (':secret mode stream handler) rest ...))))
+
+(define-syntax bitstring-pattern-continue
+  (syntax-rules ()
+    ((_ context (fields ...) (rest ...))
+      (bitstring-pattern context fields ... rest ...))))
 
 (define-syntax bitstring-pattern
   (syntax-rules (big little bitstring check float bitpacket)
     ;user handler
     ((_ (':secret mode stream handler))
-      handler)
+      (cond
+      	((zero? (bitstring-length stream))
+      	  (print (bitstring-length stream))
+      	  handler)
+      	(else
+      	  #f)))
     ; user guard expression
     ((_ (':secret mode stream handler) (check condition) rest ...)
       (and
       	condition
       	(bitstring-pattern (':secret mode stream handler) rest ...)))
-    ; packet
+    ; bitpacket
     ((_ (':secret mode stream handler) (NAME bitpacket) rest ...)
       (bitstring-packet-expand mode stream handler NAME rest ...))
+    ; bitpacket at tail
+    ((_ (':secret mode stream handler) (NAME bitpacket))
+      (bitstring-packet-expand mode stream handler NAME))
     ; greedy bitstring
     ((_ (':secret mode stream handler) (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME
@@ -160,7 +175,7 @@
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  ;(print "expand: " `(name bits type))
+      	  ;(print "expand: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
