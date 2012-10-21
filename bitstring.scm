@@ -265,7 +265,7 @@
   (fprintf out "<bitstring ~A ~A ~A>"
     (bitstring-offset x)
     (bitstring-numbits x)
-    (bitstring-buffer x)))
+    (bitstring->list x)))
 
 (define (bitstring-length bs)
   (- (bitstring-numbits bs) (bitstring-offset bs)))
@@ -384,20 +384,20 @@
       	    (func index n (read-byte offset n) acc)))))))
 
 (define (bitstring->integer-little bitstring)
-  (bitstring-fold
-    (lambda (offset n b acc)
-      (let ((bits (arithmetic-shift b (- n 8))))
-      	(bitwise-ior (arithmetic-shift bits offset) acc)))
-    0
-    bitstring))
+  (let ((start-offset (bitstring-offset bitstring)))
+    (bitstring-fold
+      (lambda (offset n b acc)
+      	(let ((bits (arithmetic-shift b (- n 8)))
+      	      (shift (- offset start-offset)))
+      	  (bitwise-ior (arithmetic-shift bits shift) acc)))
+      0
+      bitstring)))
 
 (define (bitstring->integer-big bitstring)
   (bitstring-fold
     (lambda (offset n b acc)
-      (let ((bits (arithmetic-shift b (- n 8)))
-      	    (count (bitstring-numbits bitstring)))
-      	;(print "offset: " offset (sprintf " b: ~X" b) " n: " n)
-      	(bitwise-ior (arithmetic-shift bits (- count offset n)) acc)))
+      (let ((bits (arithmetic-shift b (- n 8))))
+      	(bitwise-ior (arithmetic-shift acc n) bits)))
     0
     bitstring))
     
