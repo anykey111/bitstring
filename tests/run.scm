@@ -14,6 +14,13 @@
 (bitpacket PacketA (A 8) (PacketB bitpacket) (PacketC bitpacket))
 (test 6 (bitmatch `#(1 2 3) (( (PacketA bitpacket) ) (+ A B C))))
 
+(bitpacket PacketX (22) (ValueX 8))
+(bitpacket PacketY (33) (ValueY 8))
+(bitpacket PacketZ (44) (ValueZ 8))
+(test 13 (bitmatch `#( 44 10 )
+    (((PacketX bitpacket)) (+ 1 ValueX))
+    (((PacketY bitpacket)) (+ 2 ValueY))
+    (((PacketZ bitpacket)) (+ 3 ValueZ))))
 (test-end)
 
 (test-begin "string")
@@ -95,14 +102,14 @@
 
 (test 'ok
   (bitmatch `#( #x8F )
-    ((#x8E) 'fail1)
-    ((#x8C) 'fail2)
-    ((#x8F) 'ok)))
+    (((#x8E)) 'fail1)
+    (((#x8C)) 'fail2)
+    (((#x8F)) 'ok)))
 
 (test 'ok
   (bitmatch `#( #x8F )
-    ((#x8E) 'fail1)
-    ((#x8C) 'fail2)
+    (((#x8E)) 'fail1)
+    (((#x8C)) 'fail2)
     (else 'ok)))
 
 (test-end)

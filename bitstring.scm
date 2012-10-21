@@ -176,8 +176,6 @@
       (bitstring-pattern (':secret mode stream handler) (NAME BITS big) rest ...))
     ; rewrite immidiate value
     ((_ (':secret mode stream handler) (NAME) rest ...)
-      (bitstring-pattern (':secret mode stream handler) NAME rest ...))
-    ((_ (':secret mode stream handler) NAME rest ...)
       (case (value-type?? NAME)
       	((#\I)
       	  (bitstring-pattern (':secret mode stream handler)
@@ -194,7 +192,10 @@
       	    (bitstring-pattern (':secret mode stream handler)
       	                       (tmp bits bitstring) rest ...)))
       	(else
-      	  (error "bitstring-immidiate-value"))))))
+      	  (error "bitstring-immidiate-value"))))
+    ; dismiss other pattern forms
+    ((_ (':secret mode stream handler) NAME rest ...)
+      (error "bitstring-malformed-pattern" `NAME))))
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
