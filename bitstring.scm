@@ -144,6 +144,9 @@
       	  handler)
       	(else
       	  #f)))
+    ; zero-length bitstring
+    ((_ (':secret mode stream handler) ())
+      (zero? (bitstring-length stream)))
     ; user guard expression
     ((_ (':secret mode stream handler) (check condition) rest ...)
       (and
