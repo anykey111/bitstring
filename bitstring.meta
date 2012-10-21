@@ -1,6 +1,4 @@
-((files "bitstring.setup" "bitstring.release-info" "bitstring.meta"
-        "bitstring.scm" "tests/run.scm")
- (license "BSD")
+((license "BSD")
  (category web)
  (depends)
  (test-depends test)
