@@ -2,6 +2,7 @@
 
 (use bitstring test)
 
+
 (test-begin "construct")
 (bitpacket NString (size 8) (data (* 8 size) bitstring))
 (define (make-nstr str)
@@ -81,50 +82,6 @@
 (test-begin "u8vector")
 (test 'ok (bitmatch `#u8( 65 66 67 ) ((("A") (66) (#\C)) 'ok)))
 (test-end)
-
-(bitpacket IPAddress (a 8) (b 8) (c 8) (d 8))
-
-(bitmatch `#( #x45 #x00 #x00 #x6c #x92 #xcc #x00 #x00
-              #x38 #x06 #x00 #x00 #x92 #x95 #xba #x14 #xa9 #x7c #x15 #x95 )
-  (((Version 4)
-    (IHL 4)
-    (TOS 8)
-    (TL 16)
-    (Identification 16)
-    (Reserved 1) (DF 1) (MF 1)
-    (FramgentOffset 13)
-    (TTL 8)
-    (Protocol 8) (check (or (= Protocol 1)
-    	                    (= Protocol 2)
-    	                    (= Protocol 6)
-    	                    (= Protocol 17))) 
-    (CheckSum 16)
-    (SourceAddr 32 bitstring)
-    (DestinationAddr 32 bitstring)
-    (Optional bitstring))
-    (begin
-      (print "Version " Version)
-      (print "IHL " IHL)
-      (print "TL " TL)
-      (print "Identification " Identification)
-      (print "Reserver " Reserved " DF " DF " MF " MF)
-      (print "FramgentOffset " FramgentOffset)
-      (print "TTL " TTL)
-      (print "Protocol " (case Protocol
-		      	  ((1) "ICMP")
-		      	  ((2) "IGMP")
-		      	  ((6) "TCP")
-		      	  ((17) "UDP")))
-      (print "CheckSum " (sprintf "~X" CheckSum))
-      (print "SourceAddr " (bitmatch SourceAddr
-      	  		     (( (IPAddress bitpacket) )
-      	  			(sprintf "~A.~A.~A.~A" a b c d))))
-      (print "DestinationAddr " (bitmatch DestinationAddr
-      	  	                   (((a)(b)(c)(d))
-      	  	                     (sprintf "~A.~A.~A.~A" a b c d))))))
-  
-  (else
-    (print "bad datagram")))
 
 (bitmatch `#( 5 1 2 3 4 5)
   (((count 8) (rest (* count 8) bitstring))

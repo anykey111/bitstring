@@ -1,5 +1,5 @@
 ((license "BSD")
- (category web)
+ (category parsing)
  (depends)
  (test-depends test)
  (author "rivo")
