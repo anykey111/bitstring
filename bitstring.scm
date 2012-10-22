@@ -164,11 +164,10 @@
     ((_ (':secret "constructing" stream handler))
       handler)
     ((_ (':secret "matching" stream handler))
-      (cond  ; ensure that no more bits left
-      	((zero? (bitstring-length stream))
-      	  handler) 
-      	(else
-      	  #f)))
+      ; ensure that no more bits left
+      (if (zero? (bitstring-length stream))
+      	handler
+      	#f))
     ; zero-length bitstring
     ((_ (':secret mode stream handler) ())
       (zero? (bitstring-length stream)))
