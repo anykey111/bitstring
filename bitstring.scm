@@ -6,7 +6,8 @@
 ;;   ...
 ;;   (else expression))
 ;;
-;; (bitconstruct
+;; *** bitconstruct is the experimental future please notice ***
+;; (bitconstruct   
 ;;   (pattern ...)
 ;;   ...
 ;;   (else expression))
