@@ -11,7 +11,7 @@
 (define nstr (make-nstr "ABC"))
 (test #t (bitmatch nstr (((3) ("ABC")) #t) (else #f)))
 (test-end)
-(exit)
+
 (test-begin "append")
 ; append aligned
 (define bs (bitstring-create))

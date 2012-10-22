@@ -108,50 +108,50 @@
     ((_ value patterns ...)
       (call-with-current-continuation
 	(lambda (return)
-	  (or (bitstring-constructor (':secret "matching" value return) patterns ...)))))))
+	  (or (bitstring-constructor ("secret" "matching" value return) patterns ...)))))))
 
 (define-syntax bitconstruct
   (syntax-rules ()
     ((_ patterns ...)
       (call-with-current-continuation
 	(lambda (return)
-	  (or (bitstring-constructor (':secret "constructing" return) patterns ...)))))))
+	  (or (bitstring-constructor ("secret" "constructing" return) patterns ...)))))))
 
 (define-syntax bitstring-constructor
   (syntax-rules (else ->)
     ;; constructing syntax
-    ((_ (':secret "constructing" return))
+    ((_ ("secret" "constructing" return))
       (abort (list 'bitstring-match-failure)))
-    ((_ (':secret "constructing" return) (else expression))
+    ((_ ("secret" "constructing" return) (else expression))
       (return expression))
-    ((_ (':secret "constructing" return) (pattern ...) rest ...)
+    ((_ ("secret" "constructing" return) (pattern ...) rest ...)
       (or
       	(let ((stream (bitstring-create)))
       	  ;(print "group: " `(pattern ...))
-      	  (bitstring-pattern (':secret "constructing" stream (return stream)) pattern ...))
-      	(bitstring-constructor (':secret "constructing" return) rest ...)))
+      	  (bitstring-pattern ("secret" "constructing" stream (return stream)) pattern ...))
+      	(bitstring-constructor ("secret" "constructing" return) rest ...)))
     ;; matching syntax
-    ((_ (':secret "matching" value return))
+    ((_ ("secret" "matching" value return))
       (abort (list 'bitstring-match-failure)))
-    ((_ (':secret "matching" value return) (else expression))
+    ((_ ("secret" "matching" value return) (else expression))
       (return expression))
-    ((_ (':secret "matching" value return) (pattern ... -> expression) rest ...)
+    ((_ ("secret" "matching" value return) (pattern ... -> expression) rest ...)
       ; short form
       (bitstring-constructor
-      	(':secret "matching" value return) ((pattern ...) expression) rest ...))
-    ((_ (':secret "matching" value return) ((pattern ...) expression) rest ...)
+      	("secret" "matching" value return) ((pattern ...) expression) rest ...))
+    ((_ ("secret" "matching" value return) ((pattern ...) expression) rest ...)
       (or
       	(let ((stream (bitstring-of-any value)))
       	  ;(print "group: " `(pattern ...))
-      	  (bitstring-pattern (':secret "matching" stream (return expression)) pattern ...))
-      	(bitstring-constructor (':secret "matching" value return) rest ...)))))
+      	  (bitstring-pattern ("secret" "matching" stream (return expression)) pattern ...))
+      	(bitstring-constructor ("secret" "matching" value return) rest ...)))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
     ((_ mode stream handler name)
-      (name (':secret mode stream handler)))
+      (name ("secret" mode stream handler)))
     ((_ mode stream handler name rest ...)
-      (name (':secret mode stream handler) rest ...))))
+      (name ("secret" mode stream handler) rest ...))))
 
 (define-syntax bitstring-pattern-continue
   (syntax-rules ()
@@ -161,71 +161,71 @@
 (define-syntax bitstring-pattern
   (syntax-rules (big little bitstring check float bitpacket)
     ;user handler
-    ((_ (':secret "constructing" stream handler))
+    ((_ ("secret" "constructing" stream handler))
       handler)
-    ((_ (':secret "matching" stream handler))
+    ((_ ("secret" "matching" stream handler))
       ; ensure that no more bits left
       (if (zero? (bitstring-length stream))
       	handler
       	#f))
     ; zero-length bitstring
-    ((_ (':secret mode stream handler) ())
+    ((_ ("secret" mode stream handler) ())
       (zero? (bitstring-length stream)))
     ; user guard expression
-    ((_ (':secret mode stream handler) (check condition) rest ...)
+    ((_ ("secret" mode stream handler) (check condition) rest ...)
       (and
       	condition
-      	(bitstring-pattern (':secret mode stream handler) rest ...)))
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
     ; bitpacket
-    ((_ (':secret mode stream handler) (NAME bitpacket) rest ...)
+    ((_ ("secret" mode stream handler) (NAME bitpacket) rest ...)
       (bitstring-packet-expand mode stream handler NAME rest ...))
     ; bitpacket at tail
-    ((_ (':secret mode stream handler) (NAME bitpacket))
+    ((_ ("secret" mode stream handler) (NAME bitpacket))
       (bitstring-packet-expand mode stream handler NAME))
     ; greedy bitstring
-    ((_ (':secret mode stream handler) (NAME bitstring))
+    ((_ ("secret" mode stream handler) (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME
-      	(bitstring-pattern (':secret mode stream handler))))
+      	(bitstring-pattern ("secret" mode stream handler))))
     ; float
-    ((_ (':secret mode stream handler) (NAME BITS float) rest ...)
+    ((_ ("secret" mode stream handler) (NAME BITS float) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS float
-      	(bitstring-pattern (':secret mode stream handler) rest ...)))
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
     ; bigendian
-    ((_ (':secret mode stream handler) (NAME BITS big) rest ...)
+    ((_ ("secret" mode stream handler) (NAME BITS big) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS big
-      	(bitstring-pattern (':secret mode stream handler) rest ...)))
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
     ; littleendian
-    ((_ (':secret mode stream handler) (NAME BITS little) rest ...)
+    ((_ ("secret" mode stream handler) (NAME BITS little) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS little
-      	(bitstring-pattern (':secret mode stream handler) rest ...)))
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
     ; bitstring
-    ((_ (':secret mode stream handler) (NAME BITS bitstring) rest ...)
+    ((_ ("secret" mode stream handler) (NAME BITS bitstring) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS bitstring
-      	(bitstring-pattern (':secret mode stream handler) rest ...)))
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
     ; rewrite by default to (NAME BITS big)
-    ((_ (':secret mode stream handler) (NAME BITS) rest ...)
-      (bitstring-pattern (':secret mode stream handler) (NAME BITS big) rest ...))
+    ((_ ("secret" mode stream handler) (NAME BITS) rest ...)
+      (bitstring-pattern ("secret" mode stream handler) (NAME BITS big) rest ...))
     ; rewrite immidiate value
-    ((_ (':secret mode stream handler) (NAME) rest ...)
+    ((_ ("secret" mode stream handler) (NAME) rest ...)
       (case (value-type?? NAME)
       	((#\I)
-      	  (bitstring-pattern (':secret mode stream handler)
+      	  (bitstring-pattern ("secret" mode stream handler)
       	                     (NAME 8 big) rest ...))
       	((#\X)
-      	  (bitstring-pattern (':secret mode stream handler)
+      	  (bitstring-pattern ("secret" mode stream handler)
       	                     (NAME 8 big) rest ...))
       	((#\C)
-      	  (bitstring-pattern (':secret mode stream handler)
+      	  (bitstring-pattern ("secret" mode stream handler)
       	                     ((char->integer NAME) 8 big) rest ...))
       	((#\S)
       	  (let* ((tmp (bitstring-of-any NAME))
       	  	 (bits (bitstring-length tmp)))
-      	    (bitstring-pattern (':secret mode stream handler)
+      	    (bitstring-pattern ("secret" mode stream handler)
       	                       (tmp bits bitstring) rest ...)))
       	(else
       	  (error "bitstring-immidiate-value"))))
     ; dismiss other pattern forms
-    ((_ (':secret mode stream handler) NAME rest ...)
+    ((_ ("secret" mode stream handler) NAME rest ...)
       (error "bitstring-malformed-pattern" `NAME))))
 
 (define-syntax bitstring-pattern-expand
