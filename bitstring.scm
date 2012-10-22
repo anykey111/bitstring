@@ -41,6 +41,7 @@
    bitconstruct
    bitstring-pattern-continue
    make-bitstring
+   bitstring?
    bitstring-length
    bitstring-of-any
    bitstring-of-vector
@@ -125,7 +126,7 @@
       (return expression))
     ((_ (':secret "constructing" return) (pattern ...) rest ...)
       (or
-      	(let ((stream (bitstring-of-any (make-u8vector 16 0))))
+      	(let ((stream (bitstring-create)))
       	  ;(print "group: " `(pattern ...))
       	  (bitstring-pattern (':secret "constructing" stream (return stream)) pattern ...))
       	(bitstring-constructor (':secret "constructing" return) rest ...)))
@@ -273,7 +274,9 @@
     ((_ tmp bits little)
       (integer->bitstring-little tmp bits))
     ((_ tmp bits bitstring)
-      tmp) ; return bitstring as is
+      (if (bitstring? tmp)
+      	tmp
+      	(bitstring-of-any tmp)))
     ((_ tmp 16 float)
       (half->bitstring tmp))
     ((_ tmp 32 float)
@@ -298,13 +301,19 @@
 (define (bitstring-length bs)
   (- (bitstring-numbits bs) (bitstring-offset bs)))
   
+(define (bitstring-default-getter vec index)
+  (u8vector-ref vec index))
+
+(define (bitstring-default-setter vec index byte)
+  (u8vector-set! vec index byte))
+
 (define (bitstring-reserve numbits)
   (let* ((n (quotient numbits 8))
       	 (rem (remainder numbits 8))
     	 (aligned-size (if (zero? rem) n (+ 1 n))))
     (make-bitstring 0 numbits (make-u8vector aligned-size 0)
-      (lambda (vec index) (u8vector-ref vec index))
-      (lambda (vec index byte) (u8vector-set! vec index byte)))))
+      bitstring-default-getter
+      bitstring-default-setter)))
 
 (define (bitstring-of-string s)
   (make-bitstring 0 (* 8 (string-length s)) s 
@@ -318,8 +327,8 @@
 
 (define (bitstring-of-u8vector v)
   (make-bitstring 0 (* 8 (u8vector-length v)) v
-    (lambda (vec index) (u8vector-ref vec index))
-    (lambda (vec index byte) (u8vector-set! vec index byte))))
+    bitstring-default-getter
+    bitstring-default-setter))
 
 (define (bitstring-of-any x)
   (cond
@@ -533,13 +542,45 @@
     (bitstring-numbits-set! tmp 0)
     tmp))
 
+(define (bitstring-buffer-size bs)
+  (let ((buffer (bitstring-buffer bs)))
+    (* 8 ; return size in bits
+      (cond
+      	((u8vector? buffer)
+      	  (u8vector-length buffer))
+      	((string? buffer)
+      	  (string-length buffer))
+      	(else
+      	  (abort "not implemented for this buffer type"))))))
+
+(define (bitstring-buffer-resize bs size-in-bits)
+  (let* ((new-size (inexact->exact (/ size-in-bits 8)))
+         (tmp (make-u8vector new-size 0))
+         (used (bitstring-buffer-size bs)))
+    (let copy ((i 0)
+    	       (e (quotient used 8)))
+      (when (< i e)
+        (u8vector-set! tmp i (bitstring-load-byte bs i))
+        (copy (+ i 1) e)))
+    ; replace buffer with accessors
+    (bitstring-buffer-set! bs tmp)
+    (bitstring-setter-set! bs bitstring-default-setter)
+    (bitstring-getter-set! bs bitstring-default-getter)))
+
 (define (bitstring-append dest src)
   ; need ensure that dest buffer long enough
-  (bitstring-fold
-    (lambda (offset nbits byte acc)
-      (bitstring-append-safe acc byte nbits))
-    dest
-    src))
+  (let ((required (bitstring-length src))
+        (position (bitstring-numbits dest))
+        (reserved (bitstring-buffer-size dest)))
+    (when (< (- reserved position) required)
+      (bitstring-buffer-resize dest
+      	; grow buffer by 25% + required length
+      	(+ reserved (* 0.25 reserved) required)))
+    (bitstring-fold
+      (lambda (offset nbits byte acc)
+      	(bitstring-append-safe acc byte nbits))
+      dest
+      src)))
 
 (define (bitstring-append-safe bs byte nbits)
   (let* ((position (bitstring-numbits bs))

@@ -2,6 +2,16 @@
 
 (use bitstring test)
 
+(test-begin "construct")
+(bitpacket NString (size 8) (data (* 8 size) bitstring))
+(define (make-nstr str)
+  (let ((size (string-length str))
+        (data str))
+    (bitconstruct ((NString bitpacket)))))
+(define nstr (make-nstr "ABC"))
+(test #t (bitmatch nstr (((3) ("ABC")) #t) (else #f)))
+(test-end)
+(exit)
 (test-begin "append")
 ; append aligned
 (define bs (bitstring-create))
@@ -30,9 +40,15 @@
 (bitstring-append bs (integer->bitstring-big #b110001 6))
 (bitstring-append bs (integer->bitstring-big #b10100011100 11))
 (test #b00100101101110111000110100011100 (bitstring->integer-big bs))
+; append with resize
+(define bs (bitstring-create))
+(let ((a "Is There Love")
+      (b "in Space?"))
+  (bitstring-append bs (bitstring-of-any a))
+  (bitstring-append bs (bitstring-of-any b))
+  (test #t (bitstring-compare (bitstring-of-any (string-append a b)) bs)))
 (test-end)
 
-(exit)
 (test-begin "bitpacket")
 (bitpacket Packet1 (1) (2))
 (bitpacket Packet2 (A 8) (B))
