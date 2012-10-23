@@ -1,5 +1,11 @@
-(load "bitstring.scm")
-(use bitstring posix)
+
+; Basic TGA image parser.
+; Support True-Image type format and Run-Length-Encoding compression.
+; SPEC: http://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
+;
+; WARNING!!! bitpacket feature is experimental !!!
+
+(use bitstring posix srfi-4)
 
 (bitpacket TGA-Header
   (ID-length 8)
@@ -24,7 +30,6 @@
   (AttributesBitsPerPixel 4))
 
 (define (bitstring->blob bs)
-  ; oh better close your eyes
   (u8vector->blob (list->u8vector (bitstring->list bs))))
 
 (define (parse-tga file file-out)
@@ -34,20 +39,20 @@
          (res (file-read fi size))
          (data (car res)))
     (bitmatch data
-      ; True-Color compressed
+      ; True-Color uncompressed
       (((TGA-Header bitpacket)
       	(check (and (= 0 ColorMapType) (= 2 ImageType)))
       	(ID-data ID-length bitstring)
         (Image-data (* ImageWidth ImageHeight PixelDepth) bitstring)
         (Rest-data bitstring))
         	(begin
-        	  (print "True-Color image uncompressed")
+        	  (print "True-Color uncompressed")
         	  (print ImageWidth "x" ImageHeight "x" PixelDepth)
         	  (parse-image-uncompressed
         	    (lambda (color)
         	      (file-write fo (bitstring->blob color)))
         	    PixelDepth Image-data)))
-      ; True-Color uncompressed
+      ; True-Color compressed
       (((TGA-Header bitpacket)
       	(check (and (= 0 ColorMapType) (= 10 ImageType)))
       	(ID-data ID-length bitstring)
@@ -84,5 +89,7 @@
       	  (parse-image-uncompressed func depth RAW-data)
       	  (parse-image-compressed func depth Rest)))))
 
+; Convert images to raw pixels 
 (parse-tga "tests/24compressed.tga" "tests/24c.raw")
 (parse-tga "tests/24uncompressed.tga" "tests/24u.raw")
+

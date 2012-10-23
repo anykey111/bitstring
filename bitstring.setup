@@ -7,6 +7,3 @@
   '((version "0.1") ;; version number should be a string
   ))
 
-;(repo hg "https://bitbucket.org/rivo/{egg-name}")
-;(uri targz "https://bitbucket.org/rivo/{egg-name}/get/tip.tar.gz")
-;(release "0.1")
