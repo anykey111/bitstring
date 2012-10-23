@@ -1,4 +1,3 @@
-
 ; Example 1. Tagged data structure.
 ;
 ; struct Tagged {
@@ -81,4 +80,27 @@
                    (bitmatch DestinationAddr (((A)(B)(C)(D)) (list A B C D)))))
   (else
     (print "bad datagram")))
+
+; Example 3.1 Using bitconstruct.
+
+(define (construct-fixed-string str)
+  (bitconstruct
+    (( (string-length str) 16) (str bitstring) )))
+
+(bitmatch (construct-fixed-string "qwerty.")
+  (((7 16) ("qwerty."))
+    (print #t))
+  (else 
+    (print #f)))
+
+; Example 3.2 Concatenating bitstrings.
+
+(define (construct-complex-object)
+  (bitconstruct
+    ( ((construct-fixed-string "A") bitstring)
+      (#xAABB 16)
+      ((construct-fixed-string "RRR") bitstring))
+      (#\X)))
+
+(print (construct-complex-object))
 

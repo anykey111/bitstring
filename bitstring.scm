@@ -1,40 +1,4 @@
 ;; bitstirng module implements the subset of Erlang bit syntax.
-;; 
-;; Basic syntax description
-;; (bitmatch somedata 
-;;   ((pattern ...) expression)
-;;   ...
-;;   (else expression))
-;;
-;; *** bitconstruct is the experimental future please notice ***
-;; (bitconstruct   
-;;   (pattern ...)
-;;   ...
-;;   (else expression))
-;;
-;; (bitpacket NAME pattern ...)
-;;
-;; Notes:
-;; - else block is optional.
-;; - default endianes bigendian.
-;; - default count 8 bits.
-;; - if nothing matches and else guard didnt specified 'bitstring-match-failure
-;; - guard condition, continue evaluate only when expression returns #t.
-;; exception will thrown.
-;;
-;; pattern:
-;; (NAME)
-;; (NAME bitpacket)
-;; (NAME bitstring)
-;; (NAME BITS)
-;; (NAME BITS big)
-;; (NAME BITS little)
-;; (NAME BITS float)
-;; (NAME BITS bitstring)
-;; (check EXPRESSION)
-;;
-;;
-;;
 
 (module bitstring
   (bitmatch
@@ -177,6 +141,12 @@
       (and
       	condition
       	(bitstring-pattern ("secret" mode stream handler) rest ...)))
+    ; evaluate constructing function
+    ((_ ("secret" "constructing" stream handler) ((VALUE ...) bitstring) rest ...)
+      (and-let* ((tmp (VALUE ...))
+      	         (bits (bitstring-length tmp)))
+	(bitstring-pattern ("secret" "constructing" stream handler)
+	                   (tmp bits bitstring) rest ...)))
     ; bitpacket
     ((_ ("secret" mode stream handler) (NAME bitpacket) rest ...)
       (bitstring-packet-expand mode stream handler NAME rest ...))
@@ -231,6 +201,10 @@
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
+    ((_ "constructing" stream name continuation)
+      (and-let* ((tmp (bitstring-of-any name)))
+      	(bitstring-append stream tmp)
+      	continuation))
     ((_ "constructing" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
       	(bitstring-append stream tmp)
