@@ -1,8 +1,9 @@
 (compile -s -O2 -d1 bitstring.scm -j bitstring)
+(compile -s -O2 -d0 bitstring.import.scm)
 
 (install-extension
   'bitstring
-  '("bitstring.so")
+  '("bitstring.so" "bitstring.import.so")
   ; Assoc list with properties for your extension:
   '((version "0.1") ;; version number should be a string
   ))
