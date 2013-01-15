@@ -2,6 +2,14 @@
 
 (use bitstring test)
 
+(test-begin "string-constant")
+(test 2 (bitmatch "123" ((("234")) 1) ((("123")) 2)))
+(define s123 "123")
+(test 2 (bitmatch s123 ((("234")) 1) ((("123")) 2)))
+(test 2 (bitmatch s123 ((("234")) 1) (((s123 bitstring)) 2)))
+(test 2 (bitmatch "123" ((("234")) 1) (((s123 bitstring)) 2)))
+(test-end)
+
 
 (test-begin "construct")
 (bitpacket NString (size 8) (data (* 8 size) bitstring))
