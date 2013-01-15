@@ -189,10 +189,9 @@
       	  (bitstring-pattern ("secret" mode stream handler)
       	                     ((char->integer NAME) 8 big) rest ...))
       	((#\S)
-      	  (let* ((tmp (bitstring-of-any NAME))
-      	  	 (bits (bitstring-length tmp)))
+      	  (let ((bits (* 8 (string-length NAME))))
       	    (bitstring-pattern ("secret" mode stream handler)
-      	                       (tmp bits bitstring) rest ...)))
+      	                       (NAME bits bitstring) rest ...)))
       	(else
       	  (error "bitstring-immidiate-value"))))
     ; dismiss other pattern forms
