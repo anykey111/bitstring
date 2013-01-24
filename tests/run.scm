@@ -10,6 +10,10 @@
 (test 2 (bitmatch "123" ((("234")) 1) (((s123 bitstring)) 2)))
 (test-end)
 
+(test-begin "single-double")
+(define a (bitconstruct ((0.1 float) (0.2 32 float))))
+(test (list 0.1 0.2) (bitmatch a ((x float) (y float) -> (list x y)))) 
+(test-end)
 
 (test-begin "construct")
 (bitpacket NString (size 8) (data (* 8 size) bitstring))

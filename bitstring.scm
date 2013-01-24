@@ -25,7 +25,9 @@
    bitstring-buffer
    bitstring->half
    bitstring->single
-   single->bitstring)
+   single->bitstring
+   bitstring->double
+   double->bitstring)
 
   (import scheme chicken extras srfi-4 foreign)
   (use srfi-4)
@@ -125,7 +127,7 @@
       (bitstring-pattern context fields ... rest ...))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little bitstring check float bitpacket)
+  (syntax-rules (big little bitstring check float double bitpacket)
     ;user handler
     ((_ ("secret" "constructing" stream handler))
       handler)
@@ -158,7 +160,15 @@
     ((_ ("secret" mode stream handler) (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME
       	(bitstring-pattern ("secret" mode stream handler))))
-    ; float
+    ; double 64
+    ((_ ("secret" mode stream handler) (NAME double) rest ...)
+      (bitstring-pattern-expand mode stream NAME 64 float
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
+    ; float 32
+    ((_ ("secret" mode stream handler) (NAME float) rest ...)
+      (bitstring-pattern-expand mode stream NAME 32 float
+      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
+    ; float bits
     ((_ ("secret" mode stream handler) (NAME BITS float) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS float
       	(bitstring-pattern ("secret" mode stream handler) rest ...)))
@@ -239,7 +249,9 @@
     ((_ tmp 16 float)
       (bitstring->half tmp))
     ((_ tmp 32 float)
-      (bitstring->single tmp))))
+      (bitstring->single tmp))
+    ((_ tmp 64 float)
+      (bitstring->double tmp))))
 
 (define-syntax bitstring-write-expand
   (syntax-rules (big little bitstring float)
@@ -254,7 +266,9 @@
     ((_ tmp 16 float)
       (half->bitstring tmp))
     ((_ tmp 32 float)
-      (single->bitstring tmp))))
+      (single->bitstring tmp))
+    ((_ tmp 64 float)
+      (double->bitstring tmp))))
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; bitstring
@@ -463,55 +477,34 @@
       	      (* f (expt 2 e) (if (zero? signbit) 1. -1.))
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
 
-(define (bitstring->single bs)
-  (let ((s (bitstring-read bs 1))
-        (e (bitstring-read bs 8))
-        (m (bitstring-read bs 23)))
-    (make-single-float
-      (bitstring->integer-big s)
-      (bitstring->integer-big e)
-      (bitstring->integer-big m))))
+(define float->uint32
+    (foreign-lambda* unsigned-integer32 ((float f))
+        "C_return(*(uint32_t*)&f);"))
 
-(define (make-single-float signbit exponent mantissa)
-  (cond
-    ((and (zero? exponent) (zero? mantissa))
-      (if (zero? signbit) +0. -0.))
-    ((= exponent 255)
-      (if (zero? mantissa)
-      	(if (zero? signbit) +inf.0 -inf.0)
-      	(if (zero? signbit) +nan.0 -nan.0)))
-    (else
-      (let ((e (- exponent 127))
-      	    (m (bitwise-ior #x800000 mantissa)))
-      	(let loop ((i 23) (s 1.) (f 0.))
-      	  (let* ((x (arithmetic-shift 1 i))
-      	         (b (bitwise-and m x)))
-      	    (if (or (zero? i))
-      	      (* f (expt 2 e) (if (zero? signbit) 1. -1.))
-      	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
+(define double->uint64
+    (foreign-lambda* unsigned-integer64 ((double d))
+        "C_return(*(uint64_t*)&d);"))
 
-(define read-float
-    (foreign-lambda* void (((c-pointer float) f32)
-                           ((c-pointer unsigned-integer32) i32))
-        "*i32 = *(uint32_t*)f32;"))
+(define uint32->float
+    (foreign-lambda* float ((unsigned-integer32 i))
+        "C_return(*(float*)&i);"))
 
-(define read-double
-    (foreign-lambda* void (((c-pointer double) f64)
-                           ((c-pointer unsigned-integer64) i64))
-        "*i64 = *(uint64_t*)f64;"))
-
+(define uint64->double
+    (foreign-lambda* double ((unsigned-integer64 i))
+        "C_return(*(double*)&i);"))
+    
 (define (single->bitstring value)
-    (let-location ((f32 float value)
-                   (i32 unsigned-integer32 0))
-        (read-float (location f32) (location i32))
-        (integer->bitstring-big i32 32)))
+    (integer->bitstring-big (float->uint32 value) 32))
 
 (define (double->bitstring value)
-    (let-location ((f64 double value)
-                   (i64 unsigned-integer64 0))
-        (read-double (location f64) (location i64))
-        (integer->bitstring-big i64 64)))
+    (integer->bitstring-big (double->uint64 value) 64))
 
+(define (bitstring->single bs)
+    (uint32->float (bitstring->integer-big bs)))
+
+(define (bitstring->double bs)
+    (uint64->double (bitstring->integer-big bs)))
+            
 (define (bitstring-share bs from to)
   (let ((numbits (bitstring-numbits bs)))
     (and
