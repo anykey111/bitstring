@@ -1,4 +1,4 @@
-(load "bitstring.scm")
+;(load "bitstring.scm")
 
 (use bitstring test)
 
@@ -213,6 +213,8 @@
 (test 25. (bitstring->single (bitstring-of-vector `#( #x41 #xc8 #x00 #x00))))
 (test 0.1 (bitstring->single (bitstring-of-vector `#( #x3d #xcc #xcc #xcd))))
 (test -0.123 (bitstring->single (bitstring-of-vector `#( #xBD #xFB #xE7 #x6D))))
+(test `(0 32 #u8( #x3f #x00 #x00 #x00)) (get-fields (single->bitstring 0.5)))
+(test `(0 32 #u8( #xBD #xFB #xE7 #x6D)) (get-fields (single->bitstring -0.123)))
 (test-end)
 
 (test-exit)

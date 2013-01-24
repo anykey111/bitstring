@@ -24,9 +24,10 @@
    bitstring-numbits
    bitstring-buffer
    bitstring->half
-   bitstring->single)
+   bitstring->single
+   single->bitstring)
 
-  (import scheme chicken extras srfi-4)
+  (import scheme chicken extras srfi-4 foreign)
   (use srfi-4)
 
 (define-syntax symbol??
@@ -488,7 +489,29 @@
       	    (if (or (zero? i))
       	      (* f (expt 2 e) (if (zero? signbit) 1. -1.))
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
-      
+
+(define read-float
+    (foreign-lambda* void (((c-pointer float) f32)
+                           ((c-pointer unsigned-integer32) i32))
+        "*i32 = *(uint32_t*)f32;"))
+
+(define read-double
+    (foreign-lambda* void (((c-pointer double) f64)
+                           ((c-pointer unsigned-integer64) i64))
+        "*i64 = *(uint64_t*)f64;"))
+
+(define (single->bitstring value)
+    (let-location ((f32 float value)
+                   (i32 unsigned-integer32 0))
+        (read-float (location f32) (location i32))
+        (integer->bitstring-big i32 32)))
+
+(define (double->bitstring value)
+    (let-location ((f64 double value)
+                   (i64 unsigned-integer64 0))
+        (read-double (location f64) (location i64))
+        (integer->bitstring-big i64 64)))
+
 (define (bitstring-share bs from to)
   (let ((numbits (bitstring-numbits bs)))
     (and
