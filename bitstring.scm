@@ -16,6 +16,7 @@
    bitstring-append 
    bitstring-create
    bitstring->list
+   bitstring->blob
    bitstring->integer-big
    bitstring->integer-little
    integer->bitstring-big
@@ -338,6 +339,10 @@
       '()
       bs)))
 
+(define (bitstring->blob bs)
+    ;NOTE: optimize me! 
+    (u8vector->blob (list->u8vector (bitstring->list bs))))
+    
 (define (bitstring-compare a b)
   (and
     ;(begin (print "bitstring-compare:" a b) #t)
