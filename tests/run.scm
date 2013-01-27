@@ -1,6 +1,11 @@
-;(load "bitstring.scm")
+(load "bitstring")
 
-(use bitstring test)
+(use srfi-4 bitstring test)
+
+(test-begin "single-double")
+(define a (bitconstruct ((0.123 float) (0.2 double))))
+(test (list 0.123 0.2) (bitmatch a ((x float) (y double) -> (list x y)))) 
+(test-end)
 
 (test-begin "string-constant")
 (test 2 (bitmatch "123" ((("234")) 1) ((("123")) 2)))
@@ -8,11 +13,6 @@
 (test 2 (bitmatch s123 ((("234")) 1) ((("123")) 2)))
 (test 2 (bitmatch s123 ((("234")) 1) (((s123 bitstring)) 2)))
 (test 2 (bitmatch "123" ((("234")) 1) (((s123 bitstring)) 2)))
-(test-end)
-
-(test-begin "single-double")
-(define a (bitconstruct ((0.1 float) (0.2 32 float))))
-(test (list 0.1 0.2) (bitmatch a ((x float) (y float) -> (list x y)))) 
 (test-end)
 
 (test-begin "construct")

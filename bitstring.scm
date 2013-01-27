@@ -30,8 +30,7 @@
    bitstring->double
    double->bitstring)
 
-  (import scheme chicken extras srfi-4 foreign)
-  (use srfi-4)
+  (import scheme chicken extras foreign srfi-4)
 
 (define-syntax symbol??
   (er-macro-transformer
@@ -483,32 +482,36 @@
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
 
 (define float->uint32
-    (foreign-lambda* unsigned-integer32 ((float f))
-        "C_return(*(uint32_t*)&f);"))
+    (foreign-lambda* void ((u8vector i) (float f))
+        "*(uint32_t*)i = *(uint32_t*)&f;"))
 
 (define double->uint64
-    (foreign-lambda* unsigned-integer64 ((double d))
-        "C_return(*(uint64_t*)&d);"))
+    (foreign-lambda* void ((u8vector i) (double d))
+        "*(uint64_t*)i = *(uint64_t*)&d;"))
 
 (define uint32->float
-    (foreign-lambda* float ((unsigned-integer32 i))
-        "C_return(*(float*)&i);"))
+    (foreign-lambda* float ((blob i))
+        "C_return(*(float*)i);"))
 
 (define uint64->double
-    (foreign-lambda* double ((unsigned-integer64 i))
-        "C_return(*(double*)&i);"))
+    (foreign-lambda* double ((blob i))
+        "C_return(*(double*)i);"))
     
 (define (single->bitstring value)
-    (integer->bitstring-big (float->uint32 value) 32))
+    (let ((buf (make-u8vector 4)))
+        (float->uint32 buf value)
+        (bitstring-of-any buf)))
 
 (define (double->bitstring value)
-    (integer->bitstring-big (double->uint64 value) 64))
+    (let ((buf (make-u8vector 8)))
+        (double->uint64 buf value)
+        (bitstring-of-any buf)))
 
 (define (bitstring->single bs)
-    (uint32->float (bitstring->integer-big bs)))
+    (uint32->float (bitstring->blob bs)))
 
 (define (bitstring->double bs)
-    (uint64->double (bitstring->integer-big bs)))
+    (uint64->double (bitstring->blob bs)))
             
 (define (bitstring-share bs from to)
   (let ((numbits (bitstring-numbits bs)))
