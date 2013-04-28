@@ -104,6 +104,8 @@
   (syntax-rules (else ->)
     ((_ bstr (else handler ...))
       (capture-handler (handler ...)))
+    ((_ bstr (pattern ... -> handler ...) rest ...)
+      (bitmatch-pattern-list bstr ((pattern ...) handler ...) rest ...))
     ((_ bstr ((pattern ...) handler ...))
       (or
         (bitmatch-pattern bstr (handler ...) pattern ...)
@@ -643,4 +645,8 @@
 
 (import bitstring)
 
-(print (bitstring->blob (bitstring-of-any "123")))
+(print 
+  (ppexpand*
+    '(bitmatch "123" ((a) (b) (c) -> (print a b) (+ a b)))
+    )
+  )
