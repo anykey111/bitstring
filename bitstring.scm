@@ -3,7 +3,7 @@
 (module bitstring
   (bitmatch
    bitpacket
-   bitconstruct
+   ;bitconstruct
    bitstring-pattern-continue
    make-bitstring
    bitstring?
@@ -30,7 +30,8 @@
    bitstring->double
    double->bitstring)
 
-  (import scheme chicken extras foreign srfi-4)
+  (import scheme chicken extras)
+  (require-extension srfi-4)
 
 (define-syntax symbol??
   (er-macro-transformer
@@ -74,169 +75,157 @@
 (define-syntax bitmatch
   (syntax-rules ()
     ((_ value patterns ...)
-      (call-with-current-continuation
-	(lambda (return)
-	  (or (bitstring-constructor ("secret" "matching" value return) patterns ...)))))))
+      ;; invoke user code with captured variables
+      ((let ((bstr (bitstring-of-any value)))
+        (or (bitmatch-pattern-list bstr patterns ...)))))))
 
-(define-syntax bitconstruct
+(define-syntax capture-handler
   (syntax-rules ()
-    ((_ patterns ...)
-      (call-with-current-continuation
-	(lambda (return)
-	  (or (bitstring-constructor ("secret" "constructing" return) patterns ...)))))))
+    ((_ (handler ...))
+      (lambda () handler ...))))
 
-(define-syntax bitstring-constructor
+(define-syntax bitmatch-pattern-list
   (syntax-rules (else ->)
-    ;; constructing syntax
-    ((_ ("secret" "constructing" return))
-      (abort (list 'bitstring-match-failure)))
-    ((_ ("secret" "constructing" return) (else expression))
-      (return expression))
-    ((_ ("secret" "constructing" return) (pattern ...) rest ...)
+    ((_ bstr (else handler ...))
+      (capture-handler (handler ...)))
+    ((_ bstr ((pattern ...) handler ...))
       (or
-      	(let ((stream (bitstring-create)))
-      	  ;(print "group: " `(pattern ...))
-      	  (bitstring-pattern ("secret" "constructing" stream (return stream)) pattern ...))
-      	(bitstring-constructor ("secret" "constructing" return) rest ...)))
-    ;; matching syntax
-    ((_ ("secret" "matching" value return))
-      (abort (list 'bitstring-match-failure)))
-    ((_ ("secret" "matching" value return) (else expression))
-      (return expression))
-    ((_ ("secret" "matching" value return) (pattern ... -> expression) rest ...)
-      ; short form
-      (bitstring-constructor
-      	("secret" "matching" value return) ((pattern ...) expression) rest ...))
-    ((_ ("secret" "matching" value return) ((pattern ...) expression) rest ...)
+        (bitmatch-pattern bstr (handler ...) pattern ...)
+        (error 'bitstring-match-failure)))
+    ((_ bstr ((pattern ...) handler ...) rest ...)
       (or
-      	(let ((stream (bitstring-of-any value)))
-      	  ;(print "group: " `(pattern ...))
-      	  (bitstring-pattern ("secret" "matching" stream (return expression)) pattern ...))
-      	(bitstring-constructor ("secret" "matching" value return) rest ...)))))
+        (bitmatch-pattern bstr (handler ...) pattern ...)
+        (bitmatch-pattern-list bstr rest ...)))))
+
+(define-syntax bitmatch-pattern
+  (syntax-rules ()
+    ((_ bstr handler pattern ...)
+      ; share bitstring instance
+      (let ((stream (bitstring-of-any bstr)))
+        (bitstring-pattern "read" stream handler pattern ...)))))
+
+(define-syntax bitstring-pattern
+  (syntax-rules (big little bitstring ? float double bitpacket)
+    ; all patterns take expansion
+    ((_ mode stream handler)
+      (and
+        ; ensure that no more bits left
+        (zero? (bitstring-length stream))
+        (capture-handler handler)))
+    ; zero-length bitstring
+    ((_ mode stream handler ())
+      (or
+        (zero? (bitstring-length stream))
+        (capture-handler handler)))
+    ; user guard expression
+    ((_ mode stream handler (? guard) rest ...)
+      (and
+        (guard)
+        (bitstring-pattern mode stream handler rest ...)))
+    ; evaluate constructing function
+    ((_ "write" stream handler ((VALUE ...) bitstring) rest ...)
+      (and-let* ((tmp (VALUE ...))
+                 (bits (bitstring-length tmp)))
+        (bitstring-pattern2 "write" stream handler (tmp bits bitstring) rest ...)))
+    ; bitpacket
+    ((_ mode stream handler (NAME bitpacket) rest ...)
+      (bitstring-packet-expand mode stream handler NAME rest ...))
+    ; bitpacket at tail
+    ((_ mode stream handler (NAME bitpacket))
+      (bitstring-packet-expand mode stream handler NAME))
+    ; greedy bitstring
+    ((_ mode stream handler (NAME bitstring))
+      (bitstring-pattern-expand mode stream NAME
+        (bitstring-pattern mode stream handler)))
+    ; double 64
+    ((_ mode stream handler (NAME double) rest ...)
+      (bitstring-pattern-expand mode stream NAME 64 float
+        (bitstring-pattern mode stream handler rest ...)))
+    ; float 32
+    ((_ mode stream handler (NAME float) rest ...)
+      (bitstring-pattern-expand mode stream NAME 32 float
+        (bitstring-pattern mode stream handler rest ...)))
+    ; float bits
+    ((_ mode stream handler (NAME BITS float) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS float
+        (bitstring-pattern mode stream handler rest ...)))
+    ; bigendian
+    ((_ mode stream handler (NAME BITS big) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS big
+        (bitstring-pattern mode stream handler rest ...)))
+    ; littleendian
+    ((_ mode stream handler (NAME BITS little) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS little
+        (bitstring-pattern mode stream handler rest ...)))
+    ; bitstring
+    ((_ mode stream handler (NAME BITS bitstring) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS bitstring
+        (bitstring-pattern mode stream handler rest ...)))
+    ; rewrite by default to (NAME BITS big)
+    ((_ mode stream handler (NAME BITS) rest ...)
+      (bitstring-pattern mode stream handler (NAME BITS big) rest ...))
+    ; rewrite immidiate value
+    ((_ mode stream handler (NAME) rest ...)
+      (case (value-type?? NAME)
+        ((#\I)
+          (bitstring-pattern mode stream handler
+                             (NAME 8 big) rest ...))
+        ((#\X)
+          (bitstring-pattern mode stream handler
+                             (NAME 8 big) rest ...))
+        ((#\C)
+          (bitstring-pattern mode stream handler
+                             ((char->integer NAME) 8 big) rest ...))
+        ((#\S)
+          (let ((bits (* 8 (string-length NAME))))
+            (bitstring-pattern mode stream handler
+                               (NAME bits bitstring) rest ...)))
+        (else
+          (error "bitstring-immidiate-value"))))
+    ; dismiss other pattern forms
+    ((_ mode stream handler . rest)
+      (error "bitstring-malformed-pattern" `rest))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
     ((_ mode stream handler name)
-      (name ("secret" mode stream handler)))
+      (name mode stream handler))
     ((_ mode stream handler name rest ...)
-      (name ("secret" mode stream handler) rest ...))))
+      (name mode stream handler rest ...))))
 
 (define-syntax bitstring-pattern-continue
   (syntax-rules ()
     ((_ context (fields ...) (rest ...))
       (bitstring-pattern context fields ... rest ...))))
 
-(define-syntax bitstring-pattern
-  (syntax-rules (big little bitstring check float double bitpacket)
-    ;user handler
-    ((_ ("secret" "constructing" stream handler))
-      handler)
-    ((_ ("secret" "matching" stream handler))
-      ; ensure that no more bits left
-      (if (zero? (bitstring-length stream))
-      	handler
-      	#f))
-    ; zero-length bitstring
-    ((_ ("secret" mode stream handler) ())
-      (zero? (bitstring-length stream)))
-    ; user guard expression
-    ((_ ("secret" mode stream handler) (check condition) rest ...)
-      (and
-      	condition
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; evaluate constructing function
-    ((_ ("secret" "constructing" stream handler) ((VALUE ...) bitstring) rest ...)
-      (and-let* ((tmp (VALUE ...))
-      	         (bits (bitstring-length tmp)))
-	(bitstring-pattern ("secret" "constructing" stream handler)
-	                   (tmp bits bitstring) rest ...)))
-    ; bitpacket
-    ((_ ("secret" mode stream handler) (NAME bitpacket) rest ...)
-      (bitstring-packet-expand mode stream handler NAME rest ...))
-    ; bitpacket at tail
-    ((_ ("secret" mode stream handler) (NAME bitpacket))
-      (bitstring-packet-expand mode stream handler NAME))
-    ; greedy bitstring
-    ((_ ("secret" mode stream handler) (NAME bitstring))
-      (bitstring-pattern-expand mode stream NAME
-      	(bitstring-pattern ("secret" mode stream handler))))
-    ; double 64
-    ((_ ("secret" mode stream handler) (NAME double) rest ...)
-      (bitstring-pattern-expand mode stream NAME 64 float
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; float 32
-    ((_ ("secret" mode stream handler) (NAME float) rest ...)
-      (bitstring-pattern-expand mode stream NAME 32 float
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; float bits
-    ((_ ("secret" mode stream handler) (NAME BITS float) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS float
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; bigendian
-    ((_ ("secret" mode stream handler) (NAME BITS big) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS big
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; littleendian
-    ((_ ("secret" mode stream handler) (NAME BITS little) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS little
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; bitstring
-    ((_ ("secret" mode stream handler) (NAME BITS bitstring) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS bitstring
-      	(bitstring-pattern ("secret" mode stream handler) rest ...)))
-    ; rewrite by default to (NAME BITS big)
-    ((_ ("secret" mode stream handler) (NAME BITS) rest ...)
-      (bitstring-pattern ("secret" mode stream handler) (NAME BITS big) rest ...))
-    ; rewrite immidiate value
-    ((_ ("secret" mode stream handler) (NAME) rest ...)
-      (case (value-type?? NAME)
-      	((#\I)
-      	  (bitstring-pattern ("secret" mode stream handler)
-      	                     (NAME 8 big) rest ...))
-      	((#\X)
-      	  (bitstring-pattern ("secret" mode stream handler)
-      	                     (NAME 8 big) rest ...))
-      	((#\C)
-      	  (bitstring-pattern ("secret" mode stream handler)
-      	                     ((char->integer NAME) 8 big) rest ...))
-      	((#\S)
-      	  (let ((bits (* 8 (string-length NAME))))
-      	    (bitstring-pattern ("secret" mode stream handler)
-      	                       (NAME bits bitstring) rest ...)))
-      	(else
-      	  (error "bitstring-immidiate-value"))))
-    ; dismiss other pattern forms
-    ((_ ("secret" mode stream handler) NAME rest ...)
-      (error "bitstring-malformed-pattern" `NAME))))
-
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
-    ((_ "constructing" stream name continuation)
+    ((_ "write" stream name continuation)
       (and-let* ((tmp (bitstring-of-any name)))
       	(bitstring-append stream tmp)
       	continuation))
-    ((_ "constructing" stream name bits type continuation)
+    ((_ "write" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
       	(bitstring-append stream tmp)
       	continuation))
-    ((_ "matching" stream name continuation) ; read all rest bytes
+    ((_ "read" stream name continuation) ; read all rest bytes
       (symbol?? name
       	(and-let* ((bits (bitstring-length stream))
       	           (name (bitstring-read stream bits)))
       	  continuation)
       	(abort (list 'bitstring-invalid-value `(name)))))
-    ((_ "matching" stream name bits type continuation)
+    ((_ "read" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  ;(print "expand: " `(name bits type) " rest: " `continuation)      	  
+      	  (print "expand: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
+          (print "expand: " `(name bits type) " rest: " `continuation)
       	  (and
       	    (bitstring-compare tmp value)
       	    continuation))))))
-    
 
 (define-syntax bitstring-read-expand
   (syntax-rules (big little bitstring float)
@@ -331,16 +320,16 @@
 
 (define (bitstring->list bs)
   (reverse
-    (bitstring-fold 
-      (lambda (offset n b acc)
-      	(let ((byte (arithmetic-shift b (- n 8))))
-      	  (append (list byte) acc)))
-      '()
-      bs)))
+        (bitstring-fold 
+        (lambda (offset n b acc)
+          (let ((byte (arithmetic-shift b (- n 8))))
+            (append (list byte) acc)))
+        '()
+        bs)))
 
 (define (bitstring->blob bs)
     ;NOTE: optimize me! 
-    (u8vector->blob (list->u8vector (bitstring->list bs))))
+    (u8vector->blob (list->u8vector (bitstring->list bs 8))))
     
 (define (bitstring-compare a b)
   (and
@@ -482,20 +471,24 @@
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
 
 (define float->uint32
-    (foreign-lambda* void ((u8vector i) (float f))
-        "*(uint32_t*)i = *(uint32_t*)&f;"))
+  (lambda (a b) #t))
+    ;(foreign-lambda* void ((u8vector i) (float f))
+     ;   "*(uint32_t*)i = *(uint32_t*)&f;"))
 
 (define double->uint64
-    (foreign-lambda* void ((u8vector i) (double d))
-        "*(uint64_t*)i = *(uint64_t*)&d;"))
+  (lambda (a b) #t))
+    ;(foreign-lambda* void ((u8vector i) (double d))
+    ;    "*(uint64_t*)i = *(uint64_t*)&d;"))
 
 (define uint32->float
-    (foreign-lambda* float ((blob i))
-        "C_return(*(float*)i);"))
+  (lambda (a) 1.0))
+    ;(foreign-lambda* float ((blob i))
+    ;    "C_return(*(float*)i);"))
 
 (define uint64->double
-    (foreign-lambda* double ((blob i))
-        "C_return(*(double*)i);"))
+  (lambda (a) 1.0))
+    ;(foreign-lambda* double ((blob i))
+    ;    "C_return(*(double*)i);"))
     
 (define (single->bitstring value)
     (let ((buf (make-u8vector 4)))
@@ -601,3 +594,9 @@
 
 );module
 
+(import bitstring)
+
+(print
+  (bitmatch "\x01\x02\x03"
+    (((a)(b)(c)) (+ a b) (+ b c)))
+)
