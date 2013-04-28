@@ -217,26 +217,26 @@
   (syntax-rules ()
     ((_ "write" stream name continuation)
       (and-let* ((tmp (bitstring-of-any name)))
-        (print "write-expand:" `stream " name:" `name)
+        ;(print "write-expand:" `stream " name:" `name)
       	(bitstring-append stream tmp)
       	continuation))
     ((_ "write" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
-        (print "write-expand:" `stream " name:" `name)
+        ;(print "write-expand:" `stream " name:" `name)
       	(bitstring-append stream tmp)
       	continuation))
     ((_ "read" stream name continuation) ; read all rest bytes
       (symbol?? name
       	(and-let* ((bits (bitstring-length stream))
       	           (name (bitstring-read stream bits)))
-          (print "read-expand: " `(name bits type) " rest: " `continuation)         
+          ;(print "read-expand: " `(name bits type) " rest: " `continuation)         
       	  continuation)
       	(abort (list 'bitstring-invalid-value `(name)))))
     ((_ "read" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  (print "read-expand: " `(name bits type) " rest: " `continuation)      	  
+      	  ;(print "read-expand: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
@@ -336,18 +336,9 @@
     ((vector? x)
       (bitstring-of-vector x))))
 
-(define (bitstring->list bs)
-  (reverse
-        (bitstring-fold 
-        (lambda (offset n b acc)
-          (let ((byte (arithmetic-shift b (- n 8))))
-            (append (list byte) acc)))
-        '()
-        bs)))
-
 (define (bitstring->blob bs)
     ;NOTE: optimize me! 
-    (u8vector->blob (list->u8vector (bitstring->list bs))))
+    (u8vector->blob (list->u8vector (bitstring->list bs 8))))
     
 (define (bitstring-compare a b)
   (and
@@ -610,17 +601,38 @@
       	(bitstring-numbits-set! bs (+ position nbits))))
     bs));return bitstring
 
+(define (bitstring->list bs #!optional (bits 1) (little-endian #f))
+  (if (= bits 8)
+    (bitstring->list8 bs)
+    (bitstring->listn bs bits little-endian)))
+
+(define (bitstring->list8 bs)
+  (reverse
+    (bitstring-fold 
+      (lambda (offset n b acc)
+        (let ((byte (arithmetic-shift b (- n 8))))
+          (cons byte acc)))
+        (list)
+        bs)))
+
+(define (bitstring->listn bs bits little-endian)
+  (let loop ((data bs)
+             (acc (list)))
+    (bitmatch data
+      (()
+        (reverse acc))
+      (((? little-endian) (value bits little) (rest bitstring))
+        (loop rest (cons value acc)))
+      (((value bits big) (rest bitstring))
+        (loop rest (cons value acc)))
+      (((rest-value bitstring))
+        (loop (bitstring-of-any "")
+              (cons (if little-endian
+                      (bitstring->integer-little rest-value)
+                      (bitstring->integer-big rest-value))
+                    acc))))))
 );module
 
 (import bitstring)
 
-(define (tail-test data acc)
-  (bitmatch data
-    ((())
-      (print "zero")
-      acc)
-    (((a) (rest bitstring))
-      (print "a:" a)
-      (tail-test rest (cons a acc)))))
-
-(print (tail-test "123" (list)))
+(print (bitstring->list (bitstring-of-any "123") 3))
