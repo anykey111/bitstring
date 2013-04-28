@@ -120,7 +120,7 @@
     ; user guard expression
     ((_ mode stream handler (? guard) rest ...)
       (and
-        (guard)
+        guard
         (bitstring-pattern mode stream handler rest ...)))
     ; evaluate constructing function
     ((_ "write" stream handler ((VALUE ...) bitstring) rest ...)
@@ -598,5 +598,5 @@
 
 (print
   (bitmatch "\x01\x02\x03"
-    (((a)(b)(c)) (+ a b) (+ b c)))
+    (((a)(? (= a 1))(b)(c)) (+ a b) (+ b c)))
 )
