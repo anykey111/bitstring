@@ -42,22 +42,16 @@
       	     (no (caddr args)))
       	(if (symbol? name) yes no)))))
 
-(define-syntax value-type??
+; (expand-value x char-branch string-branch)
+(define-syntax expand-value
   (er-macro-transformer
     (lambda (e r c)
       (let* ((args (cdr e))
-      	     (name (car args)))
-      	(cond
-      	  ((integer? name)
-      	    #\I)
-      	  ((char? name)
-      	    #\C)
-      	  ((string? name)
-      	    #\S)
-      	  ((symbol? name)
-      	    #\X)
-      	  (else
-      	    #\?))))))
+             (name (car args))
+             (char-branch (cadr args))
+             (string-branch (caddr args)))
+        (if (char? name)
+          char-branch string-branch)))))
 
 (define-syntax bitpacket
   (syntax-rules ()
@@ -188,25 +182,23 @@
       (bitstring-pattern mode stream handler (NAME BITS big) rest ...))
     ; rewrite immidiate value
     ((_ mode stream handler (NAME) rest ...)
-      (case (value-type?? NAME)
-        ((#\I)
-          (bitstring-pattern mode stream handler
-                             (NAME 8 big) rest ...))
-        ((#\X)
-          (bitstring-pattern mode stream handler
-                             (NAME 8 big) rest ...))
-        ((#\C)
-          (bitstring-pattern mode stream handler
-                             ((char->integer NAME) 8 big) rest ...))
-        ((#\S)
-          (let ((bits (* 8 (string-length NAME))))
-            (bitstring-pattern mode stream handler
-                               (NAME bits bitstring) rest ...)))
-        (else
-          (error "bitstring-immidiate-value" `NAME))))
+      (symbol?? NAME
+        ; yes
+        (bitstring-pattern mode stream handler (NAME 8 big) rest ...)
+        ; no
+        (bitstring-pattern-value mode stream handler (NAME) rest ...)))
     ; dismiss other pattern forms
     ((_ mode stream handler . rest)
       (error "bitstring-malformed-pattern" `mode `stream `handler `rest))))
+
+(define-syntax bitstring-pattern-value
+  (syntax-rules ()
+    ((_ mode stream handler (VALUE) rest ...)
+      (expand-value VALUE
+        ; char
+        (bitstring-pattern mode stream handler ((char->integer VALUE) 8 big) rest ...)
+        ; string, etc... pass to bitstring-of-any
+        (bitstring-pattern mode stream handler (VALUE 8 bitstring) rest ...)))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
@@ -238,11 +230,11 @@
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  ;(print "read-expand: " `(name bits type) " rest: " `continuation)      	  
+      	  ;(print "expand-symbol: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
-          ;(print "expand: " `(name bits type) " rest: " `continuation)
+          ;(print "expand-value: " `(name bits type) " rest: " `continuation)
       	  (and
       	    (bitstring=? tmp value)
       	    continuation))))))
@@ -646,7 +638,7 @@
 (import bitstring)
 
 (print 
-  (ppexpand*
-    '(bitmatch "123" ((a) (b) (c) -> (print a b) (+ a b)))
+  (ppexpand* '
+    (bitmatch "abc" ((a) (b) (#\c) -> (print a b) (+ a b)))
     )
   )
