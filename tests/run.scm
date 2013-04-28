@@ -31,7 +31,7 @@
 (bitstring-append bs (bitstring-of-any "A"))
 (bitstring-append bs (bitstring-of-any "B"))
 (bitstring-append bs (bitstring-of-any "\x20"))
-(test #t (bitstring-compare bs (bitstring-of-any "AB\x20")))
+(test #t (bitstring=? bs (bitstring-of-any "AB\x20")))
 ; append unaligned
 (define bs (bitstring-create))
 (bitstring-append bs (integer->bitstring-big #b100 3))
@@ -59,7 +59,7 @@
       (b "in Space?"))
   (bitstring-append bs (bitstring-of-any a))
   (bitstring-append bs (bitstring-of-any b))
-  (test #t (bitstring-compare (bitstring-of-any (string-append a b)) bs)))
+  (test #t (bitstring=? (bitstring-of-any (string-append a b)) bs)))
 (test-end)
 
 (test-begin "bitpacket")
