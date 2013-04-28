@@ -42,16 +42,20 @@
       	     (no (caddr args)))
       	(if (symbol? name) yes no)))))
 
-; (expand-value x char-branch string-branch)
+; (expand-value x char str int)
 (define-syntax expand-value
   (er-macro-transformer
     (lambda (e r c)
       (let* ((args (cdr e))
              (name (car args))
              (char-branch (cadr args))
-             (string-branch (caddr args)))
-        (if (char? name)
-          char-branch string-branch)))))
+             (string-branch (caddr args))
+             (integer-branch (cadddr args)))
+        (cond
+          ((char? name) char-branch)
+          ((string? name) string-branch)
+          ((integer? name) integer-branch)
+          (else (error "invalid value" `name)))))))
 
 (define-syntax bitpacket
   (syntax-rules ()
@@ -199,8 +203,11 @@
       (expand-value VALUE
         ; char
         (bitstring-pattern mode stream handler ((char->integer VALUE) 8 big) rest ...)
-        ; string, etc... pass to bitstring-of-any
-        (bitstring-pattern mode stream handler (VALUE 8 bitstring) rest ...)))))
+        ; string
+        (bitstring-pattern mode stream handler
+          (VALUE (* 8 (string-length VALUE)) bitstring) rest ...)
+        ; integer
+        (bitstring-pattern mode stream handler (VALUE 8 big) rest ...)))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
