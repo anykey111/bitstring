@@ -30,7 +30,7 @@
    bitstring->double
    double->bitstring)
 
-  (import scheme chicken extras)
+  (import scheme chicken extras foreign)
   (require-extension srfi-1 srfi-4)
 
 (define-syntax symbol??
@@ -98,6 +98,8 @@
   (syntax-rules (else ->)
     ((_ bstr (else handler ...))
       (capture-handler (handler ...)))
+    ((_ bstr (pattern ... -> handler) rest ...)
+      (bitmatch-pattern-list bstr ((pattern ...) handler) rest ...))
     ((_ bstr (pattern ... -> handler ...) rest ...)
       (bitmatch-pattern-list bstr ((pattern ...) handler ...) rest ...))
     ((_ bstr ((pattern ...) handler ...))
@@ -512,24 +514,20 @@
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
 
 (define float->uint32
-  (lambda (a b) #t))
-    ;(foreign-lambda* void ((u8vector i) (float f))
-     ;   "*(uint32_t*)i = *(uint32_t*)&f;"))
+  (foreign-lambda* void ((u8vector i) (float f))
+    "*(uint32_t*)i = *(uint32_t*)&f;"))
 
 (define double->uint64
-  (lambda (a b) #t))
-    ;(foreign-lambda* void ((u8vector i) (double d))
-    ;    "*(uint64_t*)i = *(uint64_t*)&d;"))
+  (foreign-lambda* void ((u8vector i) (double d))
+    "*(uint64_t*)i = *(uint64_t*)&d;"))
 
 (define uint32->float
-  (lambda (a) 1.0))
-    ;(foreign-lambda* float ((blob i))
-    ;    "C_return(*(float*)i);"))
+  (foreign-lambda* float ((blob i))
+    "C_return(*(float*)i);"))
 
 (define uint64->double
-  (lambda (a) 1.0))
-    ;(foreign-lambda* double ((blob i))
-    ;    "C_return(*(double*)i);"))
+  (foreign-lambda* double ((blob i))
+    "C_return(*(double*)i);"))
     
 (define (single->bitstring value)
     (let ((buf (make-u8vector 4)))
@@ -634,11 +632,3 @@
     bs));return bitstring
 
 );module
-
-(import bitstring)
-
-(print 
-  (ppexpand* '
-    (bitmatch "abc" ((a) (b) (#\c) -> (print a b) (+ a b)))
-    )
-  )
