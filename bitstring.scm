@@ -3,7 +3,7 @@
 (module bitstring
   (bitmatch
    bitpacket
-   ;bitconstruct
+   bitconstruct
    bitstring-pattern-continue
    make-bitstring
    bitstring?
@@ -31,7 +31,7 @@
    double->bitstring)
 
   (import scheme chicken extras)
-  (require-extension srfi-4)
+  (require-extension srfi-1 srfi-4)
 
 (define-syntax symbol??
   (er-macro-transformer
@@ -64,13 +64,34 @@
     ((_ name fields ...)
       (define-syntax name
       	(er-macro-transformer
-      	  ;; (name context args ...)
+      	  ;; (name (mode stream handler) args ...)
       	  (lambda (e r c)
-      	    (let ((context (cadr e))
-      	    	  (args (cddr e)))
+      	    (let* ((context (cadr e))
+                   (mode (first context))
+                   (stream (second context))
+                   (handler (third context))
+      	    	     (args (cddr e)))
       	      ;; inline packet fields
-      	      `(bitstring-pattern-continue ,context (fields ...) ,args)))
+              ;(print "inline:" mode stream handler " fields:" `(fields ...) " args:" args)
+      	      `(bitstring-pattern-continue ,mode ,stream ,handler (fields ...) ,args)))
+                  
       	  )))))
+
+(define-syntax bitstring-pattern-continue
+  (syntax-rules ()
+    ((_ mode stream handler (fields ...) (rest ...))
+      (bitstring-pattern mode stream handler fields ... rest ...))))
+
+(define-syntax capture-handler
+  (syntax-rules ()
+    ((_ (handler ...))
+      (lambda () handler ...))))
+
+(define-syntax bitconstruct
+  (syntax-rules ()
+    ((_ patterns ...)
+      (let ((bstr (bitstring-create)))
+        (bitstring-pattern "write" bstr "no-handler" patterns ...)))))
 
 (define-syntax bitmatch
   (syntax-rules ()
@@ -78,11 +99,6 @@
       ;; invoke user code with captured variables
       ((let ((bstr (bitstring-of-any value)))
         (or (bitmatch-pattern-list bstr patterns ...)))))))
-
-(define-syntax capture-handler
-  (syntax-rules ()
-    ((_ (handler ...))
-      (lambda () handler ...))))
 
 (define-syntax bitmatch-pattern-list
   (syntax-rules (else ->)
@@ -107,16 +123,20 @@
 (define-syntax bitstring-pattern
   (syntax-rules (big little bitstring ? float double bitpacket)
     ; all patterns take expansion
-    ((_ mode stream handler)
+    ((_ "read" stream handler)
       (and
         ; ensure that no more bits left
         (zero? (bitstring-length stream))
         (capture-handler handler)))
+    ((_ "write" stream handler)
+      stream)
     ; zero-length bitstring
-    ((_ mode stream handler ())
-      (or
+    ((_ "read" stream handler ())
+      (and
         (zero? (bitstring-length stream))
         (capture-handler handler)))
+    ((_ "write" stream handler ())
+      stream)
     ; user guard expression
     ((_ mode stream handler (? guard) rest ...)
       (and
@@ -181,48 +201,46 @@
             (bitstring-pattern mode stream handler
                                (NAME bits bitstring) rest ...)))
         (else
-          (error "bitstring-immidiate-value"))))
+          (error "bitstring-immidiate-value" `NAME))))
     ; dismiss other pattern forms
     ((_ mode stream handler . rest)
-      (error "bitstring-malformed-pattern" `rest))))
+      (error "bitstring-malformed-pattern" `mode `stream `handler `rest))))
 
 (define-syntax bitstring-packet-expand
   (syntax-rules ()
     ((_ mode stream handler name)
-      (name mode stream handler))
+      (name (mode stream handler)))
     ((_ mode stream handler name rest ...)
-      (name mode stream handler rest ...))))
-
-(define-syntax bitstring-pattern-continue
-  (syntax-rules ()
-    ((_ context (fields ...) (rest ...))
-      (bitstring-pattern context fields ... rest ...))))
+      (name (mode stream handler) rest ...))))
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
     ((_ "write" stream name continuation)
       (and-let* ((tmp (bitstring-of-any name)))
+        (print "write-expand:" `stream " name:" `name)
       	(bitstring-append stream tmp)
       	continuation))
     ((_ "write" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
+        (print "write-expand:" `stream " name:" `name)
       	(bitstring-append stream tmp)
       	continuation))
     ((_ "read" stream name continuation) ; read all rest bytes
       (symbol?? name
       	(and-let* ((bits (bitstring-length stream))
       	           (name (bitstring-read stream bits)))
+          (print "read-expand: " `(name bits type) " rest: " `continuation)         
       	  continuation)
       	(abort (list 'bitstring-invalid-value `(name)))))
     ((_ "read" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (name (bitstring-read-expand tmp bits type)))
-      	  (print "expand: " `(name bits type) " rest: " `continuation)      	  
+      	  (print "read-expand: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
       	(and-let* ((tmp (bitstring-read stream bits))
       	           (value (bitstring-write-expand name bits type)))
-          (print "expand: " `(name bits type) " rest: " `continuation)
+          ;(print "expand: " `(name bits type) " rest: " `continuation)
       	  (and
       	    (bitstring-compare tmp value)
       	    continuation))))))
@@ -329,7 +347,7 @@
 
 (define (bitstring->blob bs)
     ;NOTE: optimize me! 
-    (u8vector->blob (list->u8vector (bitstring->list bs 8))))
+    (u8vector->blob (list->u8vector (bitstring->list bs))))
     
 (define (bitstring-compare a b)
   (and
@@ -596,7 +614,13 @@
 
 (import bitstring)
 
-(print
-  (bitmatch "\x01\x02\x03"
-    (((a)(? (= a 1))(b)(c)) (+ a b) (+ b c)))
-)
+(define (tail-test data acc)
+  (bitmatch data
+    ((())
+      (print "zero")
+      acc)
+    (((a) (rest bitstring))
+      (print "a:" a)
+      (tail-test rest (cons a acc)))))
+
+(print (tail-test "123" (list)))
