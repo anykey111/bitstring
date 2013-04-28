@@ -3,8 +3,8 @@
 (use srfi-4 bitstring test)
 
 (test-begin "single-double")
-(define a (bitconstruct ((0.123 float) (0.2 double))))
-(test (list 0.123 0.2) (bitmatch a ((x float) (y double) -> (list x y)))) 
+(define a (bitconstruct (0.123 float) (0.2 double)))
+(test (list 0.123 0.2) (bitmatch a (((x float) (y double)) (list x y)))) 
 (test-end)
 
 (test-begin "string-constant")
@@ -20,7 +20,7 @@
 (define (make-nstr str)
   (let ((size (string-length str))
         (data str))
-    (bitconstruct ((NString bitpacket)))))
+    (bitconstruct (NString bitpacket))))
 (define nstr (make-nstr "ABC"))
 (test #t (bitmatch nstr (((3) ("ABC")) #t) (else #f)))
 (test-end)
@@ -102,9 +102,9 @@
 (test-begin "short form")
 (bitpacket B30 (30))
 (test 'yes (bitmatch `#( 10 20 30 )
-    ((10) (20) (11) -> 'no)
-    ((10) (20) (33) -> 'no)
-    ((10) (20) (B30 bitpacket) -> 'yes)))
+    (((10) (20) (11)) 'no)
+    (((10) (20) (33)) 'no)
+    (((10) (20) (B30 bitpacket)) 'yes)))
 (test-end)
 
 (test-begin "match")
@@ -121,7 +121,7 @@
 (test 'ok
   (bitmatch `#( #x8F )
     (((1 1) (rest)) 'fail)
-    (((x 1) (check (= x 0)) (rest bitstring)) 'fail2) 
+    (((x 1) (? (= x 0)) (rest bitstring)) 'fail2) 
     (((1 1) (rest bitstring)) 'ok)))
 
 (test 'ok
