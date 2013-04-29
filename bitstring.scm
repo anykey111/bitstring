@@ -148,7 +148,7 @@
     ((_ "write" stream handler ((VALUE ...) bitstring) rest ...)
       (and-let* ((tmp (VALUE ...))
                  (bits (bitstring-length tmp)))
-        (bitstring-pattern2 "write" stream handler (tmp bits bitstring) rest ...)))
+        (bitstring-pattern "write" stream handler (tmp bits bitstring) rest ...)))
     ; bitpacket
     ((_ mode stream handler (NAME bitpacket) rest ...)
       (bitstring-packet-expand mode stream handler NAME rest ...))
