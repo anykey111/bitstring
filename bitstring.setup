@@ -5,6 +5,6 @@
   'bitstring
   '("bitstring.so" "bitstring.import.so")
   ; Assoc list with properties for your extension:
-  '((version "0.3") ;; version number should be a string
+  '((version "0.4") ;; version number should be a string
   ))
 
