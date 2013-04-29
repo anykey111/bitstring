@@ -41,7 +41,7 @@
     (bitmatch data
       ; True-Color uncompressed
       (((TGA-Header bitpacket)
-      	(check (and (= 0 ColorMapType) (= 2 ImageType)))
+      	(? (and (= 0 ColorMapType) (= 2 ImageType)))
       	(ID-data ID-length bitstring)
         (Image-data (* ImageWidth ImageHeight PixelDepth) bitstring)
         (Rest-data bitstring))
@@ -54,7 +54,7 @@
         	    PixelDepth Image-data)))
       ; True-Color compressed
       (((TGA-Header bitpacket)
-      	(check (and (= 0 ColorMapType) (= 10 ImageType)))
+      	(? (and (= 0 ColorMapType) (= 10 ImageType)))
       	(ID-data ID-length bitstring)
       	(Image-data bitstring))
       		(begin
