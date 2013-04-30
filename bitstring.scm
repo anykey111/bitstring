@@ -127,7 +127,7 @@
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little bitstring ? float double bitpacket)
+  (syntax-rules (big little bitstring check float double bitpacket)
     ; all patterns take expansion
     ((_ "read" stream handler)
       (and
@@ -144,7 +144,7 @@
     ((_ "write" stream handler ())
       stream)
     ; user guard expression
-    ((_ mode stream handler (? guard) rest ...)
+    ((_ mode stream handler (check guard) rest ...)
       (and
         guard
         (bitstring-pattern mode stream handler rest ...)))
@@ -374,7 +374,7 @@
     (bitmatch data
       (()
         (reverse acc))
-      (((? little-endian) (value bits little) (rest bitstring))
+      (((check little-endian) (value bits little) (rest bitstring))
         (loop rest (cons value acc)))
       (((value bits big) (rest bitstring))
         (loop rest (cons value acc)))

@@ -130,7 +130,7 @@
 (test 'ok
   (bitmatch `#( #x8F )
     (((1 1) (rest)) 'fail)
-    (((x 1) (? (= x 0)) (rest bitstring)) 'fail2) 
+    (((x 1) (check (= x 0)) (rest bitstring)) 'fail2) 
     (((1 1) (rest bitstring)) 'ok)))
 
 (test 'ok
