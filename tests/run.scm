@@ -2,6 +2,15 @@
 
 (use srfi-4 bitstring test)
 
+(test-begin "bytestring")
+(define bstr (bitstring-of-any (u8vector 1 3 5)))
+(define bstr23 (bitmatch bstr ((x 1) (rest bitstring) -> rest)))
+(test #t (bytestring? bstr))
+(test #f (bytestring? bstr23))
+(test 9 (bytestring-fold + 0 bstr))
+(test-error (bytestring-fold + 0 bstr23))
+(test-end)
+
 (test-begin "single-double")
 (define a (bitconstruct (0.123 float) (0.2 double)))
 (test (list 0.123 0.2) (bitmatch a (((x float) (y double)) (list x y)))) 

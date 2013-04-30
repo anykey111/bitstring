@@ -24,11 +24,15 @@
    bitstring-offset
    bitstring-numbits
    bitstring-buffer
+   bitstring-getter
    bitstring->half
    bitstring->single
    single->bitstring
    bitstring->double
-   double->bitstring)
+   double->bitstring
+   bytestring?
+   bytestring-fold
+   )
 
   (import scheme chicken extras foreign)
   (require-extension srfi-1 srfi-4)
@@ -385,7 +389,7 @@
   (and
     ;(begin (print "bitstring-compare:" a b) #t)
     (= (bitstring-length a) (bitstring-length b))
-    (equal? (bitstring->list a) (bitstring->list b))))
+    (equal? (bitstring->list a 8) (bitstring->list b 8))))
 
 (define (bitstring-load-byte bitstring index)
   (let ((readb (bitstring-getter bitstring)))
@@ -637,5 +641,21 @@
       	  (bitstring-store-byte bs (+ index 1) (arithmetic-shift byte restbits)))
       	(bitstring-numbits-set! bs (+ position nbits))))
     bs));return bitstring
+
+(define (bytestring? bs)
+  (and (zero? (remainder (bitstring-offset bs) 8))
+       (zero? (remainder (bitstring-length bs) 8))))
+
+(define (bytestring-fold proc init-value bs)
+  (or (bytestring? bs)
+      (error "bytestring shouldbe 8 bit aligned bitstring"))
+  (let ((size (fx/ (bitstring-length bs) 8))
+        (read-byte (bitstring-getter bs))
+        (buffer (bitstring-buffer bs)))
+    (let loop ((index 0)
+               (acc init-value))
+      (if (< index size)
+        (loop (+ index 1) (proc (read-byte buffer index) acc))
+        acc))))
 
 );module
