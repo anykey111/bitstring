@@ -19,8 +19,10 @@
    bitstring->blob
    bitstring->integer-big
    bitstring->integer-little
+   bitstring->integer-host
    integer->bitstring-big
    integer->bitstring-little
+   integer->bitstring-host
    bitstring-offset
    bitstring-numbits
    bitstring-buffer
@@ -127,7 +129,7 @@
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little bitstring check float double bitpacket)
+  (syntax-rules (big little host bitstring check float double bitpacket)
     ; all patterns take expansion
     ((_ "read" stream handler)
       (and
@@ -182,6 +184,10 @@
     ; littleendian
     ((_ mode stream handler (NAME BITS little) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS little
+        (bitstring-pattern mode stream handler rest ...)))
+    ; same endianness as host
+    ((_ mode stream handler (NAME BITS host) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS host
         (bitstring-pattern mode stream handler rest ...)))
     ; bitstring
     ((_ mode stream handler (NAME BITS bitstring) rest ...)
@@ -253,11 +259,13 @@
       	    continuation))))))
 
 (define-syntax bitstring-read-expand
-  (syntax-rules (big little bitstring float)
+  (syntax-rules (big little host bitstring float)
     ((_ tmp bits big)
       (bitstring->integer-big tmp))
     ((_ tmp bits little)
       (bitstring->integer-little tmp))
+    ((_ tmp bits host)
+      (bitstring->integer-host tmp))
     ((_ tmp bits bitstring)
       tmp) ; return bitstring as is
     ((_ tmp 16 float)
@@ -268,11 +276,13 @@
       (bitstring->double tmp))))
 
 (define-syntax bitstring-write-expand
-  (syntax-rules (big little bitstring float)
+  (syntax-rules (big little host bitstring float)
     ((_ tmp bits big)
       (integer->bitstring-big tmp bits))
     ((_ tmp bits little)
       (integer->bitstring-little tmp bits))
+    ((_ tmp bits host)
+      (integer->bitstring-host tmp bits))
     ((_ tmp bits bitstring)
       (if (bitstring? tmp)
       	tmp
@@ -472,6 +482,11 @@
       	(bitwise-ior (arithmetic-shift acc n) bits)))
     0
     bitstring))
+
+(define bitstring->integer-host
+  (cond-expand
+    (little-endian bitstring->integer-little)
+    (else bitstring->integer-big)))
     
 (define (integer->bitstring-little value count)
   (integer-fold
@@ -494,6 +509,11 @@
       	     (b (arithmetic-shift value (- r))))
       	(arithmetic-shift (bitwise-and b #xFF) (- 8 n))))
     count))
+
+(define integer->bitstring-host
+  (cond-expand
+    (little-endian integer->bitstring-little)
+    (else integer->bitstring-big)))
 
 (define (bitstring->half bs)
   (let ((s (bitstring-read bs 1))
