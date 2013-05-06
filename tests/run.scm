@@ -2,6 +2,28 @@
 
 (use srfi-4 bitstring test)
 
+(test-begin "integer attributes")
+(define bstr (bitstring-of-any "\xff"))
+(test -127 (bitmatch bstr ((x signed) -> x)))
+(test 255 (bitmatch bstr ((x unsigned) -> x)))
+(test -127 (bitmatch bstr ((x 8 signed) -> x)))
+(test 255 (bitmatch bstr ((x 8 unsigned) -> x)))
+(test -127 (bitmatch bstr ((x 8 big signed) -> x)))
+(test 255 (bitmatch bstr ((x 8 big unsigned) -> x)))
+(test -127 (bitmatch bstr ((x 8 little signed) -> x)))
+(test 255 (bitmatch bstr ((x 8 little unsigned) -> x)))
+(test -127 (bitmatch bstr ((x 8 signed host) -> x)))
+(test 255 (bitmatch bstr ((x 8 unsigned host) -> x)))
+(test-error (bitmatch bstr ((x 8 unsigned cost) -> x)))
+(test-end)
+
+(test-begin "bitstring->list")
+(define bstr (bitstring-of-any "\xff"))
+(test (make-list 8 1) (bitstring->list bstr 1 'big))
+(test (make-list 8 1) (bitstring->list bstr 1 'little))
+(test (make-list 8 1) (bitstring->list bstr 1 'host))
+(test-end)
+
 (test-begin "bytestring")
 (define bstr (bitstring-of-any (u8vector 1 3 5)))
 (define bstr23 (bitmatch bstr ((x 1) (rest bitstring) -> rest)))

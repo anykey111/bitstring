@@ -17,6 +17,7 @@
    bitstring-create
    bitstring->list
    bitstring->blob
+   bitstring->integer
    bitstring->integer-big
    bitstring->integer-little
    bitstring->integer-host
@@ -129,7 +130,7 @@
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little host bitstring check float double bitpacket)
+  (syntax-rules (big little host bitstring check float double bitpacket signed unsigned)
     ; all patterns take expansion
     ((_ "read" stream handler)
       (and
@@ -179,21 +180,43 @@
         (bitstring-pattern mode stream handler rest ...)))
     ; bigendian
     ((_ mode stream handler (NAME BITS big) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS big
+      (bitstring-pattern-expand mode stream NAME BITS (big unsigned)
         (bitstring-pattern mode stream handler rest ...)))
     ; littleendian
     ((_ mode stream handler (NAME BITS little) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS little
+      (bitstring-pattern-expand mode stream NAME BITS (little unsigned)
         (bitstring-pattern mode stream handler rest ...)))
     ; same endianness as host
     ((_ mode stream handler (NAME BITS host) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS host
+      (bitstring-pattern-expand mode stream NAME BITS (host unsigned)
         (bitstring-pattern mode stream handler rest ...)))
     ; bitstring
     ((_ mode stream handler (NAME BITS bitstring) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS bitstring
         (bitstring-pattern mode stream handler rest ...)))
-    ; rewrite by default to (NAME BITS big)
+    ; integer attibutes
+    ((_ mode stream handler (NAME BITS signed) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (big signed)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME BITS unsigned) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (big unsigned)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME BITS signed ENDIAN) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (ENDIAN signed)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME BITS unsigned ENDIAN) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (ENDIAN unsigned)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME BITS ENDIAN SIGNED) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (ENDIAN SIGNED)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME signed) rest ...)
+      (bitstring-pattern-expand mode stream NAME 8 (big signed)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME unsigned) rest ...)
+      (bitstring-pattern-expand mode stream NAME 8 (big unsigned)
+        (bitstring-pattern mode stream handler rest ...)))
+    ; rewrite by default to (NAME BITS (big unsigned))
     ((_ mode stream handler (NAME BITS) rest ...)
       (bitstring-pattern mode stream handler (NAME BITS big) rest ...))
     ; rewrite immidiate value
@@ -259,13 +282,9 @@
       	    continuation))))))
 
 (define-syntax bitstring-read-expand
-  (syntax-rules (big little host bitstring float)
-    ((_ tmp bits big)
-      (bitstring->integer-big tmp))
-    ((_ tmp bits little)
-      (bitstring->integer-little tmp))
-    ((_ tmp bits host)
-      (bitstring->integer-host tmp))
+  (syntax-rules (bitstring float)
+    ((_ tmp bits (ENDIAN SIGNED))
+      (bitstring-read-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)
       tmp) ; return bitstring as is
     ((_ tmp 16 float)
@@ -275,14 +294,35 @@
     ((_ tmp 64 float)
       (bitstring->double tmp))))
 
+(define-syntax integer->signed
+  (syntax-rules ()
+    ((_ BITS VALUE)
+      (let ((SBIT-INDEX (- BITS 1)))
+        (if (bit-set? VALUE SBIT-INDEX)
+          (- (bitwise-xor (arithmetic-shift 1 SBIT-INDEX) VALUE))
+          VALUE)))))
+
+(define-syntax bitstring-read-integer
+  (syntax-rules (big little host signed unsigned)
+    ((_ tmp bits big signed)
+      (integer->signed bits (bitstring->integer-big tmp)))
+    ((_ tmp bits little signed)
+      (integer->signed bits (bitstring->integer-little tmp)))
+    ((_ tmp bits host signed)
+      (integer->signed bits (bitstring->integer-host tmp)))
+    ((_ tmp bits big unsigned)
+      (bitstring->integer-big tmp))
+    ((_ tmp bits little unsigned)
+      (bitstring->integer-little tmp))
+    ((_ tmp bits host unsigned)
+      (bitstring->integer-host tmp))
+    ((_ tmp bits ENDIAN SIGNED)
+      (error "invalid integer attibute" `ENDIAN `SIGNED))))
+
 (define-syntax bitstring-write-expand
-  (syntax-rules (big little host bitstring float)
-    ((_ tmp bits big)
-      (integer->bitstring-big tmp bits))
-    ((_ tmp bits little)
-      (integer->bitstring-little tmp bits))
-    ((_ tmp bits host)
-      (integer->bitstring-host tmp bits))
+  (syntax-rules (bitstring float)
+    ((_ tmp bits (ENDIAN SIGNED))
+      (bitstring-write-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)
       (if (bitstring? tmp)
       	tmp
@@ -293,6 +333,24 @@
       (single->bitstring tmp))
     ((_ tmp 64 float)
       (double->bitstring tmp))))
+
+(define-syntax bitstring-write-integer
+  (syntax-rules (big little host signed unsigned)
+    ((_ tmp bits big signed)
+      (integer->bitstring-big tmp bits))
+    ((_ tmp bits little signed)
+      (integer->bitstring-little tmp bits))
+    ((_ tmp bits host signed)
+      (integer->bitstring-host tmp bits))
+    ((_ tmp bits big unsigned)
+      (integer->bitstring-big tmp bits))
+    ((_ tmp bits little unsigned)
+      (integer->bitstring-little tmp bits))
+    ((_ tmp bits host unsigned)
+      (integer->bitstring-host tmp bits))
+    ((_ tmp bits ENDIAN SIGNED)
+      (error "invalid integer attibute" `ENDIAN `SIGNED))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ;; bitstring
@@ -365,10 +423,10 @@
   ;NOTE: optimize me! 
   (u8vector->blob (list->u8vector (bitstring->list bs 8))))
     
-(define (bitstring->list bs #!optional (bits 1) (little-endian #f))
+(define (bitstring->list bs #!optional (bits 1) (endian 'big))
   (if (= bits 8)
     (bitstring->list8 bs)
-    (bitstring->listn bs bits little-endian)))
+    (bitstring->listn bs bits endian)))
 
 (define (bitstring->list8 bs)
   (reverse
@@ -378,22 +436,20 @@
         (list)
         bs)))
 
-(define (bitstring->listn bs bits little-endian)
+(define (bitstring->listn bs bits endian)
   (let loop ((data bs)
              (acc (list)))
     (bitmatch data
       (()
         (reverse acc))
-      (((check little-endian) (value bits little) (rest bitstring))
-        (loop rest (cons value acc)))
-      (((value bits big) (rest bitstring))
-        (loop rest (cons value acc)))
+      (((value bits bitstring) (rest bitstring))
+        (loop rest
+          (cons (bitstring->integer value endian)
+                acc)))
       (((rest-value bitstring))
         (loop (bitstring-of-any "")
-              (cons (if little-endian
-                      (bitstring->integer-little rest-value)
-                      (bitstring->integer-big rest-value))
-                    acc))))))
+          (cons (bitstring->integer rest-value endian)
+                acc))))))
 
 (define (bitstring=? a b)
   (and
@@ -464,6 +520,17 @@
       	(else
       	  (loop (+ offset n) (+ 1 index)
       	    (func index n (read-byte offset n) acc)))))))
+
+(define (bitstring->integer bitstring endian)
+  (case endian
+    ((big)
+      (bitstring->integer-big bitstring))
+    ((little)
+      (bitstring->integer-little bitstring))
+    ((host)
+      (bitstring->integer-host bitstring))
+    (else
+      (error "invalid endian value" `endian))))
 
 (define (bitstring->integer-little bitstring)
   (let ((start-offset (bitstring-offset bitstring)))
