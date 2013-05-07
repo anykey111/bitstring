@@ -13,6 +13,7 @@
    bitstring-read
    bitstring-share
    bitstring=?
+   bitstring-append
    bitstring-append! 
    bitstring-create
    bitstring->list
@@ -701,6 +702,11 @@
     (bitstring-buffer-set! bs tmp)
     (bitstring-setter-set! bs bitstring-default-setter)
     (bitstring-getter-set! bs bitstring-default-getter)))
+
+(define (bitstring-append dest src)
+  (bitconstruct 
+    (dest bitstring)
+    (src bitstring)))
 
 (define (bitstring-append! dest src)
   ; need ensure that dest buffer long enough

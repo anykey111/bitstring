@@ -73,6 +73,14 @@
 (bitstring-append! bs (bitstring-of-any "B"))
 (bitstring-append! bs (bitstring-of-any "\x20"))
 (test #t (bitstring=? bs (bitstring-of-any "AB\x20")))
+; test immutable append
+(define a (bitstring-of-any "A"))
+(define b (bitstring-of-any "B"))
+(define c (bitstring-append a b))
+(test #t (bitstring=? (bitconstruct ("AB")) c))
+(test #t (bitstring=? (bitconstruct ("A")) a))
+(test #t (bitstring=? (bitconstruct ("B")) b))
+(test 16 (bitstring-length c))
 ; append unaligned
 (define bs (bitstring-create))
 (bitstring-append! bs (integer->bitstring-big #b100 3))
