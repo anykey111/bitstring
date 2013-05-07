@@ -1,6 +1,6 @@
-(load "bitstring")
-
 (use srfi-4 bitstring test)
+
+(current-test-epsilon .1)
 
 (test-begin "integer attributes")
 (define bstr (bitstring-of-any "\xff"))
