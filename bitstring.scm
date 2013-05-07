@@ -162,6 +162,10 @@
     ; bitpacket at tail
     ((_ mode stream handler (NAME bitpacket))
       (bitstring-packet-expand mode stream handler NAME))
+    ; allow in bitconstruct dont type length
+    ((_ "write" stream handler (NAME bitstring) rest ...)
+      (bitstring-pattern-expand "write" stream NAME
+        (bitstring-pattern "write" stream handler rest ...)))
     ; greedy bitstring
     ((_ mode stream handler (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME

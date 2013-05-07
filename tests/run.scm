@@ -2,6 +2,12 @@
 
 (current-test-epsilon .1)
 
+(test-begin "construct bitstring syntax")
+(define foo "\x01")
+(test (bitconstruct (1)(2)) (bitconstruct (foo bitstring) (2)))
+(test (bitconstruct (1)) (bitconstruct (foo bitstring)))
+(test-end)
+
 (test-begin "integer attributes")
 (define bstr (bitstring-of-any "\xff"))
 (test -127 (bitmatch bstr ((x signed) -> x)))
