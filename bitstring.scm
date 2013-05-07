@@ -413,7 +413,11 @@
     ((string? x)
       (bitstring-of-string x))
     ((vector? x)
-      (bitstring-of-vector x))))
+      (bitstring-of-vector x))
+    ((blob? x)
+      (bitstring-of-u8vector (blob->u8vector/shared x)))
+    (else
+      (error "bitstring-invalid-value" x))))
 
 (define (bitstring-fold-bytes fun initial bs)
   (bitstring-fold 

@@ -2,13 +2,13 @@
 
 (current-test-epsilon .01)
 
+(test-begin "bitstring")
+
 (test-begin "construct bitstring syntax")
 (define foo "\x01")
 (test (bitconstruct (1)(2)) (bitconstruct (foo bitstring) (2)))
 (test (bitconstruct (1)) (bitconstruct (foo bitstring)))
 (test-end)
-
-(test-begin "bitstring")
 
 (test-begin "integer attributes")
 (define bstr (bitstring-of-any "\xff"))
@@ -127,21 +127,18 @@
     (((PacketZ bitpacket)) (+ 3 ValueZ))))
 (test-end)
 
-(test-begin "string")
+(test-begin "bitstring-of-any")
 (test 'ok (bitmatch "ABC" ((("A") (66) (#\C)) 'ok)))
 (test 'ok (bitmatch "ABC" ((("AB") (#\C)) 'ok)))
-(test-end)
-
-(test-begin "vector")
 (test 'ok (bitmatch `#( 65 66 67 ) ( (("A") (66) (#\C)) 'ok)))
-(test-end)
-(test-begin "u8vector")
 (test 'ok (bitmatch `#u8( 65 66 67 ) ((("A") (66) (#\C)) 'ok)))
-(test-end)
+(test 'ok (bitmatch (string->blob "ABC") ((("A") (66) (#\C)) 'ok)))
+(test-error (bitmatch (s8vector 65 66 67) ((("A") (66) (#\C)) 'ok)))
 
 (bitmatch `#( 5 1 2 3 4 5)
   (((count 8) (rest (* count 8) bitstring))
     (print " count=" count " rest=" (bitstring-length rest))))
+(test-end)
 
 (test-begin "short form")
 (bitpacket B30 (30))
