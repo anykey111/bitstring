@@ -1,6 +1,6 @@
 (use srfi-4 bitstring test)
 
-(current-test-epsilon .1)
+(current-test-epsilon .01)
 
 (test-begin "construct bitstring syntax")
 (define foo "\x01")
@@ -42,8 +42,10 @@
 (test-end)
 
 (test-begin "single-double")
-(define a (bitconstruct (0.123 float) (0.2 double)))
-(test (list 0.123 0.2) (bitmatch a (((x float) (y double)) (list x y)))) 
+(define a (bitconstruct (0.123 float)))
+(define b (bitconstruct (0.2 double)))
+(test 0.123 (bitmatch a (((x float)) x)))
+(test 0.2 (bitmatch b (((x double)) x)))
 (test-end)
 
 (test-begin "string-constant")
@@ -152,7 +154,7 @@
 (test-begin "match")
 
 (test 1.5
-  (bitmatch `#( #x38 #x00 #x3f #x80 #x00 #x00 )
+  (bitmatch `#( #x38 #x00  #x00 #x00 #x80 #x3f)
     (((a 16 float) (b 32 float))
       (+ a b))))
 
