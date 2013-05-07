@@ -13,7 +13,7 @@
    bitstring-read
    bitstring-share
    bitstring=?
-   bitstring-append 
+   bitstring-append! 
    bitstring-create
    bitstring->list
    bitstring->blob
@@ -258,12 +258,12 @@
     ((_ "write" stream name continuation)
       (and-let* ((tmp (bitstring-of-any name)))
         ;(print "write-expand:" `stream " name:" `name)
-      	(bitstring-append stream tmp)
+      	(bitstring-append! stream tmp)
       	continuation))
     ((_ "write" stream name bits type continuation)
       (and-let* ((tmp (bitstring-write-expand name bits type)))
         ;(print "write-expand:" `stream " name:" `name)
-      	(bitstring-append stream tmp)
+      	(bitstring-append! stream tmp)
       	continuation))
     ((_ "read" stream name continuation) ; read all rest bytes
       (symbol?? name
@@ -702,7 +702,7 @@
     (bitstring-setter-set! bs bitstring-default-setter)
     (bitstring-getter-set! bs bitstring-default-getter)))
 
-(define (bitstring-append dest src)
+(define (bitstring-append! dest src)
   ; need ensure that dest buffer long enough
   (let ((required (bitstring-length src))
         (position (bitstring-numbits dest))
