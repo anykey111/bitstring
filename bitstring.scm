@@ -681,7 +681,7 @@
       	  (abort "not implemented for this buffer type"))))))
 
 (define (bitstring-buffer-resize bs size-in-bits)
-  (let* ((new-size (inexact->exact (/ size-in-bits 8)))
+  (let* ((new-size (inexact->exact (ceiling (/ size-in-bits 8))))
          (tmp (make-u8vector new-size 0))
          (used (bitstring-buffer-size bs)))
     (let copy ((i 0)
