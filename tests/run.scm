@@ -8,6 +8,8 @@
 (test (bitconstruct (1)) (bitconstruct (foo bitstring)))
 (test-end)
 
+(test-begin "bitstring")
+
 (test-begin "integer attributes")
 (define bstr (bitstring-of-any "\xff"))
 (test -127 (bitmatch bstr ((x signed) -> x)))
@@ -93,10 +95,13 @@
 ; append with resize
 (define bs (bitstring-create))
 (let ((a "Is There Love")
-      (b "in Space?"))
+      (b "in Space?")
+      (c "Nobody knows."))
   (bitstring-append bs (bitstring-of-any a))
   (bitstring-append bs (bitstring-of-any b))
-  (test #t (bitstring=? (bitstring-of-any (string-append a b)) bs)))
+  (test #t (bitstring=? (bitstring-of-any (string-append a b)) bs))
+  (bitstring-append bs (bitstring-of-any c))
+  (test #t (bitstring=? (bitstring-of-any (string-append a b c)) bs)))
 (test-end)
 
 (test-begin "bitpacket")
@@ -257,6 +262,8 @@
 (test `(0 32 #u8( #x00 #x00 #x00 #x3f)) (get-fields (single->bitstring 0.5)))
 (test `(0 32 #u8( #x6D #xE7 #xFB #xBD)) (get-fields (single->bitstring -0.123)))
 (test-end)
+
+(test-end "bitstring")
 
 (test-exit)
 
