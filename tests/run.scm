@@ -32,6 +32,14 @@
 (test (make-list 8 1) (bitstring->list bstr 1 'host))
 (test-end)
 
+(test-begin "list->bitstring")
+(define foo (bitconstruct (1) (0) (1)))
+(test foo (list->bitstring (bitstring->list foo 8) 8))
+(test foo (list->bitstring (bitstring->list foo 8 'big) 8 'big))
+(test foo (list->bitstring (bitstring->list foo 8 'little) 8 'little))
+(test foo (list->bitstring (bitstring->list foo 8 'host) 8 'host))
+(test-end)
+
 (test-begin "bytestring")
 (define bstr (bitstring-of-any (u8vector 1 3 5)))
 (define bstr23 (bitmatch bstr ((x 1) (rest bitstring) -> rest)))

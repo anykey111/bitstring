@@ -22,6 +22,7 @@
    bitstring->integer-big
    bitstring->integer-little
    bitstring->integer-host
+   integer->bitstring
    integer->bitstring-big
    integer->bitstring-little
    integer->bitstring-host
@@ -34,6 +35,7 @@
    single->bitstring
    bitstring->double
    double->bitstring
+   list->bitstring
    bytestring?
    bytestring-fold
    )
@@ -460,6 +462,13 @@
           (cons (bitstring->integer rest-value endian)
                 acc))))))
 
+(define (list->bitstring lst #!optional (bits 1) (endian 'big))
+  (let loop ((rest lst)
+           (acc (bitstring-create)))
+    (if (null-list? rest)
+      acc
+      (loop (cdr rest) (bitstring-append! acc (integer->bitstring (car rest) bits endian))))))
+
 (define (bitstring=? a b)
   (and
     ;(begin (print "bitstring-compare:" a b) #t)
@@ -590,6 +599,15 @@
   (cond-expand
     (little-endian integer->bitstring-little)
     (else integer->bitstring-big)))
+
+(define (integer->bitstring value count endian)
+  (case endian
+    ('little
+      (integer->bitstring-little value count))
+    ('host
+      (integer->bitstring-host value count))
+    (else
+      (integer->bitstring-big value count))))
 
 (define (bitstring->half bs)
   (let ((s (bitstring-read bs 1))
