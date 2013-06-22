@@ -40,9 +40,24 @@
 (test foo (list->bitstring (bitstring->list foo 8 'host) 8 'host))
 (test-end)
 
+(test-begin "bitstring <-> vector")
+(define x (vector 1 2 3))
+(test x (bitstring->vector (vector->bitstring x)))
+(test-end)
+
 (test-begin "bitstring <-> u8vector")
 (define x (u8vector 1 2 3))
 (test x (bitstring->u8vector (u8vector->bitstring x)))
+(test-end)
+
+(test-begin "bitstring <-> blob")
+(define x '#${1 2 3})
+(test x (bitstring->blob (blob->bitstring x)))
+(test-end)
+
+(test-begin "bitstring <-> string")
+(define x "123")
+(test x (bitstring->string (string->bitstring x)))
 (test-end)
 
 (test-begin "bytestring")

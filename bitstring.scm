@@ -12,6 +12,7 @@
    vector->bitstring
    u8vector->bitstring
    string->bitstring
+   blob->bitstring
    bitstring-read
    bitstring-share
    bitstring=?
@@ -20,6 +21,8 @@
    bitstring-create
    bitstring->list
    bitstring->blob
+   bitstring->string
+   bitstring->vector
    bitstring->u8vector
    bitstring->integer
    bitstring->integer-big
@@ -410,6 +413,9 @@
     bitstring-default-getter
     bitstring-default-setter))
 
+(define (blob->bitstring b)
+  (u8vector->bitstring (blob->u8vector/shared b)))
+
 (define (->bitstring x)
   (cond
     ((bitstring? x)
@@ -437,9 +443,15 @@
   ;NOTE: optimize me! 
   (u8vector->blob (list->u8vector (bitstring->list bs 8))))
 
+(define (bitstring->string bs)
+  (list->string (map integer->char (bitstring->list bs 8))))
+
 (define (bitstring->u8vector bs)
   (list->u8vector (bitstring->list bs 8)))
   
+(define (bitstring->vector bs)
+  (list->vector (bitstring->list bs 8)))
+
 (define (bitstring->list bs #!optional (bits 1) (endian 'big))
   (if (= bits 8)
     (bitstring->list8 bs)
