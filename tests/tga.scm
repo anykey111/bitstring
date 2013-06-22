@@ -29,9 +29,6 @@
   (#x00 2) ; reserved
   (AttributesBitsPerPixel 4))
 
-(define (bitstring->blob bs)
-  (u8vector->blob (list->u8vector (bitstring->list bs))))
-
 (define (parse-tga file file-out)
   (let* ((fi (file-open file (+ open/rdonly open/binary)))
          (fo (file-open file-out (+ open/write open/creat open/trunc open/binary)))
