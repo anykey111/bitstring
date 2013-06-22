@@ -8,8 +8,10 @@
    make-bitstring
    bitstring?
    bitstring-length
-   bitstring-of-any
-   bitstring-of-vector
+   ->bitstring
+   vector->bitstring
+   u8vector->bitstring
+   string->bitstring
    bitstring-read
    bitstring-share
    bitstring=?
@@ -18,6 +20,7 @@
    bitstring-create
    bitstring->list
    bitstring->blob
+   bitstring->u8vector
    bitstring->integer
    bitstring->integer-big
    bitstring->integer-little
@@ -105,7 +108,7 @@
   (syntax-rules ()
     ((_ value patterns ...)
       ;; invoke user code with captured variables
-      ((let ((bstr (bitstring-of-any value)))
+      ((let ((bstr (->bitstring value)))
         (or (bitmatch-pattern-list bstr patterns ...)))))))
 
 (define-syntax bitmatch-pattern-list
@@ -129,7 +132,7 @@
   (syntax-rules ()
     ((_ bstr handler pattern ...)
       ; share bitstring instance
-      (let ((stream (bitstring-of-any bstr)))
+      (let ((stream (->bitstring bstr)))
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-pattern
@@ -259,7 +262,7 @@
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()
     ((_ "write" stream name continuation)
-      (and-let* ((tmp (bitstring-of-any name)))
+      (and-let* ((tmp (->bitstring name)))
         ;(print "write-expand:" `stream " name:" `name)
       	(bitstring-append! stream tmp)
       	continuation))
@@ -333,7 +336,7 @@
     ((_ tmp bits bitstring)
       (if (bitstring? tmp)
       	tmp
-      	(bitstring-of-any tmp)))
+      	(->bitstring tmp)))
     ((_ tmp 16 float)
       (half->bitstring tmp))
     ((_ tmp 32 float)
@@ -392,33 +395,33 @@
       bitstring-default-getter
       bitstring-default-setter)))
 
-(define (bitstring-of-string s)
+(define (string->bitstring s)
   (make-bitstring 0 (* 8 (string-length s)) s 
     (lambda (str index) (char->integer (string-ref str index)))
     (lambda (str index byte) (string-set! str index (integer->char byte)))))
 
-(define (bitstring-of-vector v)
+(define (vector->bitstring v)
   (make-bitstring 0 (* 8 (vector-length v)) v
     (lambda (vec index) (vector-ref vec index))
     (lambda (vec index byte) (vector-set! vec index byte))))
 
-(define (bitstring-of-u8vector v)
+(define (u8vector->bitstring v)
   (make-bitstring 0 (* 8 (u8vector-length v)) v
     bitstring-default-getter
     bitstring-default-setter))
 
-(define (bitstring-of-any x)
+(define (->bitstring x)
   (cond
     ((bitstring? x)
       (bitstring-share x (bitstring-offset x) (bitstring-numbits x)))
     ((u8vector? x)
-      (bitstring-of-u8vector x))
+      (u8vector->bitstring x))
     ((string? x)
-      (bitstring-of-string x))
+      (string->bitstring x))
     ((vector? x)
-      (bitstring-of-vector x))
+      (vector->bitstring x))
     ((blob? x)
-      (bitstring-of-u8vector (blob->u8vector/shared x)))
+      (u8vector->bitstring (blob->u8vector/shared x)))
     (else
       (error "bitstring-invalid-value" x))))
 
@@ -433,7 +436,10 @@
 (define (bitstring->blob bs)
   ;NOTE: optimize me! 
   (u8vector->blob (list->u8vector (bitstring->list bs 8))))
-    
+
+(define (bitstring->u8vector bs)
+  (list->u8vector (bitstring->list bs 8)))
+  
 (define (bitstring->list bs #!optional (bits 1) (endian 'big))
   (if (= bits 8)
     (bitstring->list8 bs)
@@ -458,7 +464,7 @@
           (cons (bitstring->integer value endian)
                 acc)))
       (((rest-value bitstring))
-        (loop (bitstring-of-any "")
+        (loop (->bitstring "")
           (cons (bitstring->integer rest-value endian)
                 acc))))))
 
@@ -657,12 +663,12 @@
 (define (single->bitstring value)
     (let ((buf (make-u8vector 4)))
         (float->uint32 buf value)
-        (bitstring-of-any buf)))
+        (->bitstring buf)))
 
 (define (double->bitstring value)
     (let ((buf (make-u8vector 8)))
         (double->uint64 buf value)
-        (bitstring-of-any buf)))
+        (->bitstring buf)))
 
 (define (bitstring->single bs)
     (uint32->float (bitstring->blob bs)))
@@ -692,7 +698,7 @@
 
 ; create empty bitstring and reserve 16 bytes
 (define (bitstring-create)
-  (let ((tmp (bitstring-of-u8vector (make-u8vector 16 0))))
+  (let ((tmp (u8vector->bitstring (make-u8vector 16 0))))
     (bitstring-numbits-set! tmp 0)
     tmp))
 
