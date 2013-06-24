@@ -95,6 +95,14 @@
 (test-end)
 
 (test-begin "append")
+; append list immutable
+(test "1234567890"
+ (bitstring->string
+   (bitstring-append (->bitstring "123") (->bitstring "456") (->bitstring "7890"))))
+; append list mutable
+(define bs (bitstring-create))
+(bitstring-append! bs (->bitstring "123") (->bitstring "456") (->bitstring "7890"))
+(test "1234567890" (bitstring->string bs))
 ; append aligned
 (define bs (bitstring-create))
 (bitstring-append! bs (->bitstring "A"))

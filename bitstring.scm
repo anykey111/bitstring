@@ -390,11 +390,11 @@
 (define (bitstring-default-setter vec index byte)
   (u8vector-set! vec index byte))
 
-(define (bitstring-reserve numbits)
+(define (bitstring-reserve numbits position)
   (let* ((n (quotient numbits 8))
       	 (rem (remainder numbits 8))
     	 (aligned-size (if (zero? rem) n (+ 1 n))))
-    (make-bitstring 0 numbits (make-u8vector aligned-size 0)
+    (make-bitstring 0 position (make-u8vector aligned-size 0)
       bitstring-default-getter
       bitstring-default-setter)))
 
@@ -596,7 +596,7 @@
     (lambda (index n b acc)
       (bitstring-store-byte acc index (arithmetic-shift b (- 8 n)))
       acc)
-    (bitstring-reserve count)
+    (bitstring-reserve count count)
     (lambda (offset n) 
       (bitwise-and (arithmetic-shift value (- offset)) #xFF))
     count))
@@ -606,7 +606,7 @@
     (lambda (index n b acc)
       (bitstring-store-byte acc index b)
       acc)
-    (bitstring-reserve count)
+    (bitstring-reserve count count)
     (lambda (offset n)
       (let* ((r (- count offset n))
       	     (b (arithmetic-shift value (- r))))
@@ -739,12 +739,28 @@
     (bitstring-setter-set! bs bitstring-default-setter)
     (bitstring-getter-set! bs bitstring-default-getter)))
 
-(define (bitstring-append dest src)
-  (bitconstruct 
-    (dest bitstring)
-    (src bitstring)))
+(define (bitstring-required-length args)
+  (fold
+    (lambda (bs len)
+      (+ len (bitstring-length bs)))
+    0
+    args))
 
-(define (bitstring-append! dest src)
+(define (bitstring-append . args)
+  (fold
+    (lambda (bs acc)
+      (bitstring-append! acc bs))
+	(bitstring-reserve (bitstring-required-length args) 0)
+    args))
+
+(define (bitstring-append! dst . args)
+  (fold                      
+    (lambda (bs acc)
+      (bitstring-append2! acc bs))
+    dst
+    args))
+
+(define (bitstring-append2! dest src)
   ; need ensure that dest buffer long enough
   (let ((required (bitstring-length src))
         (position (bitstring-numbits dest))
