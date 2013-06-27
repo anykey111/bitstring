@@ -439,16 +439,32 @@
         initial
         bs))
 
-(define (bitstring->blob bs)
-  ;NOTE: optimize me! 
-  (u8vector->blob (list->u8vector (bitstring->list bs 8))))
+(define (bitstring-size-in-bytes bs)
+  (let ((n (bitstring-length bs)))
+    (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1))))
+
+(define (bitstring->blob bs #!optional (zero-extending 'left))
+  (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
+
+(define (bitstring->u8vector bs #!optional (zero-extending 'left))
+  (let ((vec (make-u8vector (bitstring-size-in-bytes bs))))
+    (bitstring-fold
+	  (lambda (offset numbits value index)
+	    (if (= numbits 8)
+	      (u8vector-set! vec index value)
+	      (u8vector-set! vec index
+	        (let ((ze-left (arithmetic-shift value (- numbits 8))))
+	      	  (if (eq? zero-extending 'left) 
+	      	    ze-left
+                (arithmetic-shift ze-left (- 8 numbits))))))
+        (+ index 1))
+      0
+      bs)
+    vec))
 
 (define (bitstring->string bs)
   (list->string (map integer->char (bitstring->list bs 8))))
 
-(define (bitstring->u8vector bs)
-  (list->u8vector (bitstring->list bs 8)))
-  
 (define (bitstring->vector bs)
   (list->vector (bitstring->list bs 8)))
 
