@@ -384,19 +384,12 @@
 (define (bitstring-length bs)
   (- (bitstring-numbits bs) (bitstring-offset bs)))
   
-(define (bitstring-default-getter vec index)
-  (u8vector-ref vec index))
-
-(define (bitstring-default-setter vec index byte)
-  (u8vector-set! vec index byte))
-
 (define (bitstring-reserve numbits position)
   (let* ((n (quotient numbits 8))
       	 (rem (remainder numbits 8))
     	 (aligned-size (if (zero? rem) n (+ 1 n))))
     (make-bitstring 0 position (make-u8vector aligned-size 0)
-      bitstring-default-getter
-      bitstring-default-setter)))
+      u8vector-ref u8vector-set!)))
 
 (define (string->bitstring s)
   (make-bitstring 0 (* 8 (string-length s)) s 
@@ -404,14 +397,10 @@
     (lambda (str index byte) (string-set! str index (integer->char byte)))))
 
 (define (vector->bitstring v)
-  (make-bitstring 0 (* 8 (vector-length v)) v
-    (lambda (vec index) (vector-ref vec index))
-    (lambda (vec index byte) (vector-set! vec index byte))))
+  (make-bitstring 0 (* 8 (vector-length v)) v vector-ref vector-set!))
 
 (define (u8vector->bitstring v)
-  (make-bitstring 0 (* 8 (u8vector-length v)) v
-    bitstring-default-getter
-    bitstring-default-setter))
+  (make-bitstring 0 (* 8 (u8vector-length v)) v u8vector-ref u8vector-set!))
 
 (define (blob->bitstring b)
   (u8vector->bitstring (blob->u8vector/shared b)))
@@ -752,8 +741,8 @@
         (copy (+ i 1) e)))
     ; replace buffer with accessors
     (bitstring-buffer-set! bs tmp)
-    (bitstring-setter-set! bs bitstring-default-setter)
-    (bitstring-getter-set! bs bitstring-default-getter)))
+    (bitstring-getter-set! bs u8vector-ref)
+    (bitstring-setter-set! bs u8vector-set!)))
 
 (define (bitstring-required-length args)
   (fold
