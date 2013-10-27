@@ -15,10 +15,12 @@
    blob->bitstring
    bitstring-read
    bitstring-share
+   bitstring-reserve
    bitstring=?
    bitstring-append
    bitstring-append! 
-   bitstring-create
+   bitstring-not
+   bitstring-bit-set?
    bitstring->list
    bitstring->blob
    bitstring->string
@@ -32,8 +34,8 @@
    integer->bitstring-big
    integer->bitstring-little
    integer->bitstring-host
-   bitstring-offset
-   bitstring-numbits
+   bitstring-start
+   bitstring-end
    bitstring-buffer
    bitstring-getter
    bitstring->half
@@ -41,10 +43,7 @@
    single->bitstring
    bitstring->double
    double->bitstring
-   list->bitstring
-   bytestring?
-   bytestring-fold
-   )
+   list->bitstring)
 
   (import scheme chicken extras foreign)
   (require-extension srfi-1 srfi-4)
@@ -104,7 +103,7 @@
 (define-syntax bitconstruct
   (syntax-rules ()
     ((_ patterns ...)
-      (let ((bstr (bitstring-create)))
+      (let ((bstr (bitstring-reserve 64)))
         (bitstring-pattern "write" bstr "no-handler" patterns ...)))))
 
 (define-syntax bitmatch
@@ -280,7 +279,7 @@
       	           (name (bitstring-read stream bits)))
           ;(print "read-expand: " `(name bits type) " rest: " `continuation)         
       	  continuation)
-      	(abort (list 'bitstring-invalid-value `(name)))))
+        (error 'bitstring-invalid-value `(name))))
     ((_ "read" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
@@ -307,22 +306,20 @@
     ((_ tmp 64 float)
       (bitstring->double tmp))))
 
-(define-syntax integer->signed
-  (syntax-rules ()
-    ((_ BITS VALUE)
-      (let ((SBIT-INDEX (- BITS 1)))
-        (if (bit-set? VALUE SBIT-INDEX)
-          (- (bitwise-xor (arithmetic-shift 1 SBIT-INDEX) VALUE))
-          VALUE)))))
-
 (define-syntax bitstring-read-integer
   (syntax-rules (big little host signed unsigned)
     ((_ tmp bits big signed)
-      (integer->signed bits (bitstring->integer-big tmp)))
+     (if (bitstring-bit-set? tmp 0)
+       (- (+ 1 (bitstring->integer-big (bitstring-not tmp))))
+       (bitstring->integer-big tmp)))
     ((_ tmp bits little signed)
-      (integer->signed bits (bitstring->integer-little tmp)))
+     (if (bitstring-bit-set? tmp (if (< bits 8) (sub1 bits) (- bits 8)))
+       (- (+ 1 (bitstring->integer-little (bitstring-not tmp))))
+       (bitstring->integer-little tmp)))
     ((_ tmp bits host signed)
-      (integer->signed bits (bitstring->integer-host tmp)))
+      (cond-expand
+        (little-endian (bitstring-read-integer tmp bits little signed))
+        (else (bitstring-read-integer tmp bits big signed))))
     ((_ tmp bits big unsigned)
       (bitstring->integer-big tmp))
     ((_ tmp bits little unsigned)
@@ -369,30 +366,29 @@
 ;; bitstring
 
 (define-record bitstring
-  offset  ; offset in bits
-  numbits ; length of the bitstring in bits
+  start   ; buffer offset in bits
+  end     ; buffer offset in bits
   buffer  ; any container with random access
   getter  ; (lambda (buffer index) -> byte)
   setter) ; (lambda (buffer index byte) -> void)
 
 (define-record-printer (bitstring x out)
   (fprintf out "<bitstring ~A ~A ~A>"
-    (bitstring-offset x)
-    (bitstring-numbits x)
-    (bitstring->list x)))
+    (bitstring-start x) (bitstring-end x) (bitstring-buffer x)))
 
 (define (bitstring-length bs)
-  (- (bitstring-numbits bs) (bitstring-offset bs)))
+  (- (bitstring-end bs) (bitstring-start bs)))
   
-(define (bitstring-reserve numbits position)
-  (let* ((n (quotient numbits 8))
-      	 (rem (remainder numbits 8))
-    	 (aligned-size (if (zero? rem) n (+ 1 n))))
-    (make-bitstring 0 position (make-u8vector aligned-size 0)
-      u8vector-ref u8vector-set!)))
+; compute space required for {{n}} bits
+(define (space-required n alignment)
+  (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1)))
+
+(define (bitstring-reserve size-in-bits)
+  (let ((size (space-required size-in-bits 8)))
+    (make-bitstring 0 0 (make-u8vector size 0) u8vector-ref u8vector-set!)))
 
 (define (string->bitstring s)
-  (make-bitstring 0 (* 8 (string-length s)) s 
+  (make-bitstring 0 (* 8 (string-length s)) s
     (lambda (str index) (char->integer (string-ref str index)))
     (lambda (str index byte) (string-set! str index (integer->char byte)))))
 
@@ -408,7 +404,7 @@
 (define (->bitstring x)
   (cond
     ((bitstring? x)
-      (bitstring-share x (bitstring-offset x) (bitstring-numbits x)))
+      (bitstring-share x (bitstring-start x) (bitstring-end x)))
     ((u8vector? x)
       (u8vector->bitstring x))
     ((string? x)
@@ -420,14 +416,6 @@
     (else
       (error "bitstring-invalid-value" x))))
 
-(define (bitstring-fold-bytes fun initial bs)
-  (bitstring-fold 
-      (lambda (offset n b acc)
-        (let ((byte (arithmetic-shift b (- n 8))))
-          (fun byte acc)))
-        initial
-        bs))
-
 (define (bitstring-size-in-bytes bs)
   (let ((n (bitstring-length bs)))
     (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1))))
@@ -436,20 +424,22 @@
   (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
 
 (define (bitstring->u8vector bs #!optional (zero-extending 'left))
-  (let ((vec (make-u8vector (bitstring-size-in-bytes bs))))
-    (bitstring-fold
-	  (lambda (offset numbits value index)
-	    (if (= numbits 8)
-	      (u8vector-set! vec index value)
-	      (u8vector-set! vec index
-	        (let ((ze-left (arithmetic-shift value (- numbits 8))))
-	      	  (if (eq? zero-extending 'left) 
-	      	    ze-left
-                (arithmetic-shift ze-left (- 8 numbits))))))
-        (+ index 1))
-      0
-      bs)
-    vec))
+  (let loop ((data bs)
+             (index 0)
+             (tmp (make-u8vector (space-required (bitstring-length bs) 8))))
+    (bitmatch data
+      (()
+       tmp)
+      (((value 8 bitstring) (rest bitstring))
+       (u8vector-set! tmp index (bitstring->integer value 'big))
+       (loop rest (add1 index) tmp))
+      (((value bitstring))
+       (let ((len (bitstring-length value))
+             (byte (bitstring->integer value 'big)))
+         (u8vector-set! tmp index (if (eq? zero-extending 'left)
+                                    byte
+                                    (fxshl byte (- 8 len))))
+         tmp)))))
 
 (define (bitstring->string bs)
   (list->string (map integer->char (bitstring->list bs 8))))
@@ -458,17 +448,7 @@
   (list->vector (bitstring->list bs 8)))
 
 (define (bitstring->list bs #!optional (bits 1) (endian 'big))
-  (if (= bits 8)
-    (bitstring->list8 bs)
-    (bitstring->listn bs bits endian)))
-
-(define (bitstring->list8 bs)
-  (reverse
-    (bitstring-fold-bytes
-      (lambda (byte acc)
-        (cons byte acc))
-        (list)
-        bs)))
+  (bitstring->listn bs bits endian))
 
 (define (bitstring->listn bs bits endian)
   (let loop ((data bs)
@@ -477,17 +457,13 @@
       (()
         (reverse acc))
       (((value bits bitstring) (rest bitstring))
-        (loop rest
-          (cons (bitstring->integer value endian)
-                acc)))
+        (loop rest (cons (bitstring->integer value endian) acc)))
       (((rest-value bitstring))
-        (loop (->bitstring "")
-          (cons (bitstring->integer rest-value endian)
-                acc))))))
+        (loop "" (cons (bitstring->integer rest-value endian) acc))))))
 
 (define (list->bitstring lst #!optional (bits 1) (endian 'big))
   (let loop ((rest lst)
-           (acc (bitstring-create)))
+             (acc (bitstring-reserve (* (length lst) bits))))
     (if (null-list? rest)
       acc
       (loop (cdr rest) (bitstring-append! acc (integer->bitstring (car rest) bits endian))))))
@@ -498,69 +474,94 @@
     (= (bitstring-length a) (bitstring-length b))
     (equal? (bitstring->list a 8) (bitstring->list b 8))))
 
-(define (bitstring-load-byte bitstring index)
-  (let ((readb (bitstring-getter bitstring)))
-    (readb (bitstring-buffer bitstring) index)))
+(define (bitstring-load-byte bs index)
+  ((bitstring-getter bs) (bitstring-buffer bs) index))
 
-(define (bitstring-load-word bitstring index)
-  (bitwise-ior
-    (arithmetic-shift (bitstring-load-byte bitstring index) 8)
-    (bitstring-load-byte bitstring (+ index 1))))
- 
-(define (bitstring-store-byte bitstring index value)
-  (let ((writeb (bitstring-setter bitstring)))
-    (writeb (bitstring-buffer bitstring) index (bitwise-and #xFF value))))
+(define (bitstring-store-byte bs index value)
+  ((bitstring-setter bs) (bitstring-buffer bs) index value))
 
-(define (bitstring-fold func init-value bitstring)
-  (let* ((offset (bitstring-offset bitstring))
-         (count (bitstring-numbits bitstring))
-         (shift (remainder offset 8)))
-    (if (zero? shift)
-      (bitstring-fold-aligned func init-value bitstring offset count)
-      (bitstring-fold-shifted func init-value bitstring offset count shift))))        
+; extract {{count}} bits starting from {{offset}}, {{value}} should'be 8 bit integer.
+(define-inline (extract-bits value offset count)
+  (printf "value:~A offset:~A count:~A => ~A~N" value offset count
+    (fxshr (fxand (fxshl value offset) #xFF) (- 8 count)))
+  (fxshr (fxand (fxshl value offset) #xFF)
+         (- 8 count)))
 
-(define (bitstring-fold-aligned func init-value bitstring from to)
-  (let loop ((offset from)
-             (index (quotient from 8))
-             (acc init-value))
-    (let ((n (min 8 (- to offset))))
+(define (bitstring-fold proc init bs)
+  (printf "fold ~A~N" bs)
+  (let loop ((start (bitstring-start bs))
+             (end (bitstring-end bs))
+             (index (quotient (bitstring-start bs) 8))
+             (drift (remainder (bitstring-start bs) 8))
+             (count (- 8 (remainder (bitstring-start bs) 8)))
+             (acc init))
+    (let ((n (min (- end start) count)))
+      (printf "fold start:~A end:~A index:~A n:~A~N" start end index n)
       (if (<= n 0)
-      	acc
-      	(loop (+ offset n) (+ 1 index)
-      	  (func offset n (bitstring-load-byte bitstring index) acc))))))
+        acc
+        (loop (+ start n) end
+              (add1 index) ; move index
+              0 ; resert drift
+              8 ; setup 8 bit chunk
+              (proc (extract-bits (bitstring-load-byte bs index) drift n) n acc))))))
 
-(define (bitstring-fold-shifted func init-value bitstring from to shift)
-  (let loop ((offset from)
-      	     (index (quotient from 8))
-      	     (acc init-value))
-    (let ((n (min 8 (- to offset))))
-      (cond
-      	((<= n 0)
-      	  acc)
-      	((< 8 (+ n shift))
-      	  ; read splitted bits as word with shift
-      	  (let* ((word (bitstring-load-word bitstring index))
-      	         (drift (- shift 8))
-      	         (byte (bitwise-and (arithmetic-shift word drift) #xFF)))
-      	    (loop (+ offset n) (+ 1 index) (func offset n byte acc))))
-      	(else ; read rest bits
-      	  (let* ((tmp (bitstring-load-byte bitstring index))
-      	         (drift (remainder offset 8))
-      	         (byte (bitwise-and (arithmetic-shift tmp drift) #xFF)))
-      	    ;(print (sprintf "tmp:~X n:~A dritf:~A byte:~X  shift:~A" tmp n drift byte shift)) 
-      	    (loop (+ offset n) (+ 1 index) (func offset n byte acc))))))))
-	
-(define (integer-fold func init-value read-byte count)
-  (let loop ((offset 0)
-             (index 0)
-             (acc init-value))
-    (let ((n (min 8 (- count offset))))
-      (cond 
-      	((<= n 0)
-      	  acc)
-      	(else
-      	  (loop (+ offset n) (+ 1 index)
-      	    (func index n (read-byte offset n) acc)))))))
+(define (bitstring-not bs)
+  (let ((len (bitstring-length bs))
+        (tmp (bitstring->u8vector bs 'right)))
+    ((foreign-primitive void ((u8vector data) (int size))
+      "int i; for(i=0;i<size;++i) data[i] = ~data[i];") tmp (u8vector-length tmp))
+    (make-bitstring 0 len tmp u8vector-ref u8vector-set!)))
+
+(define (bitstring-bit-set? bs n)
+  (let ((start (bitstring-start bs))
+        (end (bitstring-end bs)))
+    (let* ((index (if (negative? n)
+                    (+ end n)
+                    (+ start n)))
+           (byte-index (quotient index 8))
+           (bit-index (- 7 (remainder index 8))))
+      (if (and (<= start index) (< index end))
+        (bit-set? (bitstring-load-byte bs byte-index) bit-index)
+        (error "out of range" start end n)))))
+
+(define (bitstring->integer-big bs)
+  (bitstring-fold
+    (lambda (value count result)
+      (bitwise-ior (arithmetic-shift result count) value))
+    0
+    bs))
+
+(define (bitstring->integer-little bs)
+  (car (bitstring-fold
+         (lambda (value count acc)
+           (let ((result (car acc))
+                 (shift (cdr acc)))
+             (cons (bitwise-ior result (arithmetic-shift value shift))
+                   (+ shift count))))
+         (cons 0 0)
+         bs)))
+
+(define (integer->bitstring-little value count)
+  (let loop ((start 0)
+             (n (min count 8))
+             (bs (bitstring-reserve count)))
+    (bitstring-end-set! bs count)
+    (if (<= count start)
+      bs
+      (let ((x (bitwise-and (arithmetic-shift value (- start)) 255)))
+        (bitstring-store-byte bs (quotient start 8) (fxshl x (- 8 n)))
+        (loop (+ start n) (min (- count start n) 8) bs)))))
+
+(define (integer->bitstring-big value count)
+  (let loop ((start count)
+             (n (min count 8))
+             (bs (bitstring-reserve count)))
+    (bitstring-end-set! bs count)
+    (if (<= start 0)
+      bs
+      (let ((x (bitwise-and (arithmetic-shift value (- n start)) 255)))
+        (bitstring-store-byte bs (quotient (- count start) 8) (fxshl x (- 8 n)))
+        (loop (- start n) (min start 8) bs)))))
 
 (define (bitstring->integer bitstring endian)
   (case endian
@@ -573,50 +574,10 @@
     (else
       (error "invalid endian value" `endian))))
 
-(define (bitstring->integer-little bitstring)
-  (let ((start-offset (bitstring-offset bitstring)))
-    (bitstring-fold
-      (lambda (offset n b acc)
-      	(let ((bits (arithmetic-shift b (- n 8)))
-      	      (shift (- offset start-offset)))
-      	  (bitwise-ior (arithmetic-shift bits shift) acc)))
-      0
-      bitstring)))
-
-(define (bitstring->integer-big bitstring)
-  (bitstring-fold
-    (lambda (offset n b acc)
-      (let ((bits (arithmetic-shift b (- n 8))))
-      	(bitwise-ior (arithmetic-shift acc n) bits)))
-    0
-    bitstring))
-
 (define bitstring->integer-host
   (cond-expand
     (little-endian bitstring->integer-little)
     (else bitstring->integer-big)))
-    
-(define (integer->bitstring-little value count)
-  (integer-fold
-    (lambda (index n b acc)
-      (bitstring-store-byte acc index (arithmetic-shift b (- 8 n)))
-      acc)
-    (bitstring-reserve count count)
-    (lambda (offset n) 
-      (bitwise-and (arithmetic-shift value (- offset)) #xFF))
-    count))
-
-(define (integer->bitstring-big value count)
-  (integer-fold
-    (lambda (index n b acc)
-      (bitstring-store-byte acc index b)
-      acc)
-    (bitstring-reserve count count)
-    (lambda (offset n)
-      (let* ((r (- count offset n))
-      	     (b (arithmetic-shift value (- r))))
-      	(arithmetic-shift (bitwise-and b #xFF) (- 8 n))))
-    count))
 
 (define integer->bitstring-host
   (cond-expand
@@ -692,32 +653,17 @@
 
 (define (bitstring->double bs)
     (uint64->double (bitstring->blob bs)))
-            
-(define (bitstring-share bs from to)
-  (let ((numbits (bitstring-numbits bs)))
-    (and
-      (<= from to)
-      (<= to numbits)
-      (make-bitstring from to 
-      	(bitstring-buffer bs)
-      	(bitstring-getter bs)
-      	(bitstring-setter bs)))))
-   
-(define (bitstring-read bs count)
-  (let* ((from (bitstring-offset bs))
-         (to (+ from count))
-         (shared (bitstring-share bs from to)))
-    (if shared
-      (begin
-      	(bitstring-offset-set! bs to)
-      	shared)
-      #f)))
 
-; create empty bitstring and reserve 16 bytes
-(define (bitstring-create)
-  (let ((tmp (u8vector->bitstring (make-u8vector 16 0))))
-    (bitstring-numbits-set! tmp 0)
-    tmp))
+(define (bitstring-share bs from to)
+  (make-bitstring from to (bitstring-buffer bs) (bitstring-getter bs) (bitstring-setter bs)))
+   
+(define (bitstring-read bs n)
+  (let ((from (bitstring-start bs))
+        (to (+ (bitstring-start bs) n)))
+    (and (<= to (bitstring-end bs))
+      (let ((bs/shared (bitstring-share bs from to)))
+        (bitstring-start-set! bs to)
+        bs/shared))))
 
 (define (bitstring-buffer-size bs)
   (let ((buffer (bitstring-buffer bs)))
@@ -731,7 +677,7 @@
       	  (abort "not implemented for this buffer type"))))))
 
 (define (bitstring-buffer-resize bs size-in-bits)
-  (let* ((new-size (inexact->exact (ceiling (/ size-in-bits 8))))
+  (let* ((new-size (space-required size-in-bits 32))
          (tmp (make-u8vector new-size 0))
          (used (bitstring-buffer-size bs)))
     (let copy ((i 0)
@@ -755,7 +701,7 @@
   (fold
     (lambda (bs acc)
       (bitstring-append! acc bs))
-	(bitstring-reserve (bitstring-required-length args) 0)
+    (bitstring-reserve (bitstring-required-length args))
     args))
 
 (define (bitstring-append! dst . args)
@@ -768,52 +714,35 @@
 (define (bitstring-append2! dest src)
   ; need ensure that dest buffer long enough
   (let ((required (bitstring-length src))
-        (position (bitstring-numbits dest))
+        (position (bitstring-end dest))
         (reserved (bitstring-buffer-size dest)))
     (when (< (- reserved position) required)
       (bitstring-buffer-resize dest
-      	; grow buffer by 25% + required length
-      	(+ reserved (* 0.25 reserved) required)))
+        (+ reserved (inexact->exact (* 0.50 reserved)) required)))
     (bitstring-fold
-      (lambda (offset nbits byte acc)
-      	(bitstring-append-safe acc byte nbits))
+      (lambda (value nbits acc)
+        (bitstring-append-safe! acc (fxshl value (- 8 nbits)) nbits))
       dest
       src)))
 
-(define (bitstring-append-safe bs byte nbits)
-  (let* ((position (bitstring-numbits bs))
+(define (bitstring-append-safe! bs value nbits)
+  (let* ((position (bitstring-end bs))
          (index (quotient position 8))
          (drift (remainder position 8)))
     (if (zero? drift) 
       ; store aligned
       (begin
-      	(bitstring-store-byte bs index byte)
-      	(bitstring-numbits-set! bs (+ position nbits)))
+        (bitstring-store-byte bs index value)
+        (bitstring-end-set! bs (+ position nbits)))
       ; store unaligned
       (let ((byte-src (bitstring-load-byte bs index))
-      	    (byte-dst (arithmetic-shift byte (- drift)))
+            (byte-dst (fxshr value drift))
       	    (restbits (- 8 drift)))
-      	(bitstring-store-byte bs index (bitwise-ior byte-src byte-dst))
+        (bitstring-store-byte bs index (fxior byte-src byte-dst))
       	; store rest bits if didnt fit in current byte
       	(if (< restbits nbits)
-      	  (bitstring-store-byte bs (+ index 1) (arithmetic-shift byte restbits)))
-      	(bitstring-numbits-set! bs (+ position nbits))))
+          (bitstring-store-byte bs (+ index 1) (fxshl value restbits)))
+        (bitstring-end-set! bs (+ position nbits))))
     bs));return bitstring
-
-(define (bytestring? bs)
-  (and (zero? (remainder (bitstring-offset bs) 8))
-       (zero? (remainder (bitstring-length bs) 8))))
-
-(define (bytestring-fold proc init-value bs)
-  (or (bytestring? bs)
-      (error "bytestring shouldbe 8 bit aligned bitstring"))
-  (let ((size (fx/ (bitstring-length bs) 8))
-        (read-byte (bitstring-getter bs))
-        (buffer (bitstring-buffer bs)))
-    (let loop ((index 0)
-               (acc init-value))
-      (if (< index size)
-        (loop (+ index 1) (proc (read-byte buffer index) acc))
-        acc))))
 
 );module

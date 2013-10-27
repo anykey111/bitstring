@@ -4,6 +4,8 @@
 
 (test-begin "bitstring")
 
+;;;;;;;;;;;;;;;;;;
+
 (test-begin "construct bitstring syntax")
 (define foo "\x01")
 (test (bitconstruct (1)(2)) (bitconstruct (foo bitstring) (2)))
@@ -11,18 +13,22 @@
 (test-end)
 
 (test-begin "integer attributes")
-(define bstr (->bitstring "\xff"))
-(test -127 (bitmatch bstr ((x signed) -> x)))
-(test 255 (bitmatch bstr ((x unsigned) -> x)))
-(test -127 (bitmatch bstr ((x 8 signed) -> x)))
-(test 255 (bitmatch bstr ((x 8 unsigned) -> x)))
-(test -127 (bitmatch bstr ((x 8 big signed) -> x)))
-(test 255 (bitmatch bstr ((x 8 big unsigned) -> x)))
-(test -127 (bitmatch bstr ((x 8 little signed) -> x)))
-(test 255 (bitmatch bstr ((x 8 little unsigned) -> x)))
-(test -127 (bitmatch bstr ((x 8 signed host) -> x)))
-(test 255 (bitmatch bstr ((x 8 unsigned host) -> x)))
+(test -25 (bitmatch "\xE7" ((x 8 signed) -> x)))
+;(test -45 (bitmatch "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xD3" ((skip 1) (x 63 signed) -> x)))
+(define bstr (->bitstring "\xFE"))
+(test -2 (bitmatch bstr ((x signed) -> x)))
+(test 254 (bitmatch bstr ((x unsigned) -> x)))
+(test -2 (bitmatch bstr ((x 8 signed) -> x)))
+(test 254 (bitmatch bstr ((x 8 unsigned) -> x)))
+(test -2 (bitmatch bstr ((x 8 big signed) -> x)))
+(test 254 (bitmatch bstr ((x 8 big unsigned) -> x)))
+(test -2 (bitmatch bstr ((x 8 little signed) -> x)))
+(test 254 (bitmatch bstr ((x 8 little unsigned) -> x)))
+(test -2 (bitmatch bstr ((x 8 signed host) -> x)))
+(test 254 (bitmatch bstr ((x 8 unsigned host) -> x)))
 (test-error (bitmatch bstr ((x 8 unsigned cost) -> x)))
+(test -1 (bitmatch (bitstring-share bstr 0 4) ((x 4 signed) -> x)))
+(test -2 (bitmatch (bitstring-share bstr 4 8) ((x 4 signed) -> x)))
 (test-end)
 
 (test-begin "bitstring->list")
@@ -33,11 +39,12 @@
 (test-end)
 
 (test-begin "list->bitstring")
-(define foo (bitconstruct (1) (0) (1)))
-(test foo (list->bitstring (bitstring->list foo 8) 8))
-(test foo (list->bitstring (bitstring->list foo 8 'big) 8 'big))
-(test foo (list->bitstring (bitstring->list foo 8 'little) 8 'little))
-(test foo (list->bitstring (bitstring->list foo 8 'host) 8 'host))
+(define foo (list 1 0 1))
+(define bar (list->bitstring foo 8))
+(test foo (bitstring->list bar 8))
+(test foo (bitstring->list bar 8 'big))
+(test foo (bitstring->list bar 8 'little))
+(test foo (bitstring->list bar 8 'host))
 (test-end)
 
 (test-begin "bitstring <-> vector")
@@ -79,15 +86,6 @@
 (test x (bitstring->string (string->bitstring x)))
 (test-end)
 
-(test-begin "bytestring")
-(define bstr (->bitstring (u8vector 1 3 5)))
-(define bstr23 (bitmatch bstr ((x 1) (rest bitstring) -> rest)))
-(test #t (bytestring? bstr))
-(test #f (bytestring? bstr23))
-(test 9 (bytestring-fold + 0 bstr))
-(test-error (bytestring-fold + 0 bstr23))
-(test-end)
-
 (test-begin "single-double")
 (define a (bitconstruct (0.123 float)))
 (define b (bitconstruct (0.2 double)))
@@ -119,11 +117,11 @@
  (bitstring->string
    (bitstring-append (->bitstring "123") (->bitstring "456") (->bitstring "7890"))))
 ; append list mutable
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (bitstring-append! bs (->bitstring "123") (->bitstring "456") (->bitstring "7890"))
 (test "1234567890" (bitstring->string bs))
 ; append aligned
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (bitstring-append! bs (->bitstring "A"))
 (bitstring-append! bs (->bitstring "B"))
 (bitstring-append! bs (->bitstring "\x20"))
@@ -137,7 +135,7 @@
 (test #t (bitstring=? (bitconstruct ("B")) b))
 (test 16 (bitstring-length c))
 ; append unaligned
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (bitstring-append! bs (integer->bitstring-big #b100 3))
 (bitstring-append! bs (integer->bitstring-big #b10 2))
 (bitstring-append! bs (integer->bitstring-big #b1 1))
@@ -147,18 +145,18 @@
 (bitstring-append! bs (integer->bitstring-big #b10100 5))
 (test #b100101010110010100 (bitstring->integer-big bs))
 ; append unaligned with overflow
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (bitstring-append! bs (integer->bitstring-big #b100111010 9))
 (bitstring-append! bs (integer->bitstring-big #b1000111100100 13))
 (test #b1001110101000111100100 (bitstring->integer-big bs))
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (bitstring-append! bs (integer->bitstring-big #b0 1))
 (bitstring-append! bs (integer->bitstring-big #b01001011011101 14))
 (bitstring-append! bs (integer->bitstring-big #b110001 6))
 (bitstring-append! bs (integer->bitstring-big #b10100011100 11))
 (test #b00100101101110111000110100011100 (bitstring->integer-big bs))
 ; append with resize
-(define bs (bitstring-create))
+(define bs (->bitstring (u8vector)))
 (let ((a "Is There Love")
       (b "in Space?")
       (c "Nobody knows."))
@@ -244,7 +242,7 @@
 
 (test-begin "read")
 (define bs (vector->bitstring `#(65 66 67)))
-(test #f (bitstring-share bs 0 100))
+(test #f (bitstring-read bs 100))
 (test 2 (bitstring->integer-big (bitstring-share bs 0 3)))
 (test 5 (bitstring->integer-big (bitstring-share bs 3 10)))
 (test 579 (bitstring->integer-big (bitstring-share bs 10 24)))
@@ -261,7 +259,7 @@
 (test-end)
 
 (define (get-fields bs)
-  (list (bitstring-offset bs) (bitstring-numbits bs) (bitstring-buffer bs)))
+  (list (bitstring-start bs) (bitstring-end bs) (bitstring-buffer bs)))
 
 (test-begin "big")
 (test `(0 0 #u8()) (get-fields (integer->bitstring-big 0 0)))
