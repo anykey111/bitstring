@@ -6,6 +6,13 @@
 
 ;;;;;;;;;;;;;;;;;;
 
+(test-begin "bit-set?")
+(test #t (bitstring-bit-set? (->bitstring '#${80 00}) 0))
+(test #t (bitstring-bit-set? (->bitstring '#${01 00}) 7))
+(test #t (bitstring-bit-set? (->bitstring '#${00 01}) -1))
+(test #t (bitstring-bit-set? (->bitstring '#${80 00}) -16))
+(test-end)
+
 (test-begin "construct bitstring syntax")
 (define foo "\x01")
 (test (bitconstruct (1)(2)) (bitconstruct (foo bitstring) (2)))
