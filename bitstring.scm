@@ -279,7 +279,7 @@
       	           (name (bitstring-read stream bits)))
           ;(print "read-expand: " `(name bits type) " rest: " `continuation)         
       	  continuation)
-        (error 'bitstring-invalid-value `(name))))
+        (syntax-error "not a symbol name" `name)))
     ((_ "read" stream name bits type continuation)
       (symbol?? name
       	(and-let* ((tmp (bitstring-read stream bits))
@@ -365,7 +365,7 @@
     ((_ tmp bits host unsigned)
       (integer->bitstring-host tmp bits))
     ((_ tmp bits ENDIAN SIGNED)
-      (error "invalid integer attibute" `ENDIAN `SIGNED))))
+      (syntax-error "invalid integer attibute" `ENDIAN `SIGNED))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;
