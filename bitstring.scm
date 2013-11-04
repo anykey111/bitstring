@@ -286,12 +286,18 @@
       	           (name (bitstring-read-expand tmp bits type)))
       	  ;(print "expand-symbol: " `(name bits type) " rest: " `continuation)      	  
       	  continuation)
-      	(and-let* ((tmp (bitstring-read stream bits))
-      	           (value (bitstring-write-expand name bits type)))
+        (and-let* ((tmp (bitstring-read stream bits)))
           ;(print "expand-value: " `(name bits type) " rest: " `continuation)
       	  (and
-      	    (bitstring=? tmp value)
+            (optimize-compare tmp name bits type)
       	    continuation))))))
+
+(define-syntax optimize-compare
+  (syntax-rules ()
+    ((_ tmp value bits (ENDIAN SIGNED))
+     (= value (bitstring-read-integer tmp bits ENDIAN SIGNED)))
+    ((_ tmp value bits type)
+     (bitstring=? tmp (bitstring-write-expand value bits type)))))
 
 (define-syntax bitstring-read-expand
   (syntax-rules (bitstring float)
@@ -327,7 +333,7 @@
     ((_ tmp bits host unsigned)
       (bitstring->integer-host tmp))
     ((_ tmp bits ENDIAN SIGNED)
-      (error "invalid integer attibute" `ENDIAN `SIGNED))))
+      (syntax-error "invalid integer attibute" `ENDIAN `SIGNED))))
 
 (define-syntax bitstring-write-expand
   (syntax-rules (bitstring float)
@@ -470,9 +476,28 @@
 
 (define (bitstring=? a b)
   (and
-    ;(begin (print "bitstring-compare:" a b) #t)
     (= (bitstring-length a) (bitstring-length b))
-    (equal? (bitstring->list a 8) (bitstring->list b 8))))
+    (if (and (bytestring? a) (bytestring? b))
+      (bytestring=? a b)
+      (equal? (bitstring->list a 8) (bitstring->list b 8)))))
+
+(define (bytestring? bs)
+  (and (zero? (remainder (bitstring-start bs) 8))
+       (zero? (remainder (bitstring-length bs) 8))))
+
+(define (bytestring=? a b)
+  (let ((alen (quotient (bitstring-length a) 8))
+        (blen (quotient (bitstring-length b) 8))
+        (e (quotient (bitstring-end a) 8)))
+    (and (= alen blen)
+      (let loop ((i (quotient (bitstring-start a) 8))
+                 (j (quotient (bitstring-start b) 8)))
+        (if (< i e)
+          (if (= (bitstring-load-byte a i)
+                 (bitstring-load-byte b j))
+            (loop (add1 i) (add1 j))
+               #f)
+          #t)))))
 
 (define (bitstring-load-byte bs index)
   ((bitstring-getter bs) (bitstring-buffer bs) index))
@@ -482,13 +507,10 @@
 
 ; extract {{count}} bits starting from {{offset}}, {{value}} should'be 8 bit integer.
 (define-inline (extract-bits value offset count)
-  (printf "value:~A offset:~A count:~A => ~A~N" value offset count
-    (fxshr (fxand (fxshl value offset) #xFF) (- 8 count)))
   (fxshr (fxand (fxshl value offset) #xFF)
          (- 8 count)))
 
 (define (bitstring-fold proc init bs)
-  (printf "fold ~A~N" bs)
   (let loop ((start (bitstring-start bs))
              (end (bitstring-end bs))
              (index (quotient (bitstring-start bs) 8))
@@ -496,12 +518,11 @@
              (count (- 8 (remainder (bitstring-start bs) 8)))
              (acc init))
     (let ((n (min (- end start) count)))
-      (printf "fold start:~A end:~A index:~A n:~A~N" start end index n)
       (if (<= n 0)
         acc
         (loop (+ start n) end
               (add1 index) ; move index
-              0 ; resert drift
+              0 ; reset drift
               8 ; setup 8 bit chunk
               (proc (extract-bits (bitstring-load-byte bs index) drift n) n acc))))))
 
