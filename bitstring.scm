@@ -21,6 +21,7 @@
    bitstring-append! 
    bitstring-not
    bitstring-bit-set?
+   bitstring-reverse
    bitstring->list
    bitstring->blob
    bitstring->string
@@ -180,15 +181,21 @@
         (bitstring-pattern mode stream handler)))
     ; double 64
     ((_ mode stream handler (NAME double) rest ...)
-      (bitstring-pattern-expand mode stream NAME 64 float
+      (bitstring-pattern-expand mode stream NAME 64 (float big)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME double ENDIAN) rest ...)
+      (bitstring-pattern-expand mode stream NAME 64 (float ENDIAN)
         (bitstring-pattern mode stream handler rest ...)))
     ; float 32
     ((_ mode stream handler (NAME float) rest ...)
-      (bitstring-pattern-expand mode stream NAME 32 float
+      (bitstring-pattern-expand mode stream NAME 32 (float big)
+        (bitstring-pattern mode stream handler rest ...)))
+    ((_ mode stream handler (NAME float ENDIAN) rest ...)
+      (bitstring-pattern-expand mode stream NAME 32 (float ENDIAN)
         (bitstring-pattern mode stream handler rest ...)))
     ; float bits
-    ((_ mode stream handler (NAME BITS float) rest ...)
-      (bitstring-pattern-expand mode stream NAME BITS float
+    ((_ mode stream handler (NAME BITS float ENDIAN) rest ...)
+      (bitstring-pattern-expand mode stream NAME BITS (float ENDIAN)
         (bitstring-pattern mode stream handler rest ...)))
     ; bigendian
     ((_ mode stream handler (NAME BITS big) rest ...)
@@ -299,18 +306,31 @@
     ((_ tmp value bits type)
      (bitstring=? tmp (bitstring-write-expand value bits type)))))
 
+(define-syntax float-reorder-bytes
+  (syntax-rules (little big host)
+    ((_ host tmp)
+     (cond-expand
+       (little-endian (float-reorder-bytes little tmp))
+       (else (float-reorder-bytes big tmp))))
+    ((_ little tmp)
+     (cond-expand
+       (little-endian tmp)
+       (else (bitstring-reverse tmp 8))))
+    ((_ big tmp)
+     (cond-expand
+       (little-endian (bitstring-reverse tmp 8))
+       (else tmp)))))
+
 (define-syntax bitstring-read-expand
   (syntax-rules (bitstring float)
+    ((_ tmp 32 (float ENDIAN))
+     (bitstring->single (float-reorder-bytes ENDIAN tmp)))
+    ((_ tmp 64 (float ENDIAN))
+     (bitstring->double (float-reorder-bytes ENDIAN tmp)))
     ((_ tmp bits (ENDIAN SIGNED))
-      (bitstring-read-integer tmp bits ENDIAN SIGNED))
+     (bitstring-read-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)
-      tmp) ; return bitstring as is
-    ((_ tmp 16 float)
-      (bitstring->half tmp))
-    ((_ tmp 32 float)
-      (bitstring->single tmp))
-    ((_ tmp 64 float)
-      (bitstring->double tmp))))
+     tmp))) ; return bitstring as is
 
 (define-syntax bitstring-read-integer
   (syntax-rules (big little host signed unsigned)
@@ -337,18 +357,16 @@
 
 (define-syntax bitstring-write-expand
   (syntax-rules (bitstring float)
+    ((_ tmp 32 (float ENDIAN))
+     (float-reorder-bytes ENDIAN (single->bitstring tmp)))
+    ((_ tmp 64 (float ENDIAN))
+     (float-reorder-bytes ENDIAN (double->bitstring tmp)))
     ((_ tmp bits (ENDIAN SIGNED))
       (bitstring-write-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)
       (if (bitstring? tmp)
       	tmp
-      	(->bitstring tmp)))
-    ((_ tmp 16 float)
-      (half->bitstring tmp))
-    ((_ tmp 32 float)
-      (single->bitstring tmp))
-    ((_ tmp 64 float)
-      (double->bitstring tmp))))
+        (->bitstring tmp)))))
 
 (define-syntax bitstring-write-integer
   (syntax-rules (big little host signed unsigned)
@@ -473,6 +491,9 @@
     (if (null-list? rest)
       acc
       (loop (cdr rest) (bitstring-append! acc (integer->bitstring (car rest) bits endian))))))
+
+(define (bitstring-reverse bs #!optional (bits 1) (endian 'big))
+  (list->bitstring (reverse (bitstring->list bs bits endian)) bits endian))
 
 (define (bitstring=? a b)
   (and

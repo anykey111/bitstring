@@ -54,6 +54,11 @@
 (test foo (bitstring->list bar 8 'host))
 (test-end)
 
+(test-begin "bitstring-reverse")
+(define bs (->bitstring '#${0a 0b 0c 0d}))
+(test (list #xd #xc #xb #xa) (bitstring->list (bitstring-reverse bs 8) 8))
+(test-end)
+
 (test-begin "bitstring <-> vector")
 (define x (vector 1 2 3))
 (test x (bitstring->vector (vector->bitstring x)))
@@ -98,6 +103,25 @@
 (define b (bitconstruct (0.2 double)))
 (test 0.123 (bitmatch a (((x float)) x)))
 (test 0.2 (bitmatch b (((x double)) x)))
+
+(test 0.123
+      (bitmatch (bitconstruct (0.123 float little))
+        (((f float little)) f)))
+
+(test 0.123
+      (bitmatch (bitconstruct (0.123 float big))
+        (((f float big)) f)))
+
+(test 0.123
+      (bitmatch (bitconstruct (0.123 double host))
+        (((f double host)) f)))
+
+(test (list 63 191 124 237 145 104 114 176)
+      (bitstring->list (bitconstruct (0.123 double big)) 8))
+
+(test (list 176 114 104 145 237 124 191 63)
+      (bitstring->list (bitconstruct (0.123 double little)) 8))
+
 (test-end)
 
 (test-begin "string-constant")
@@ -218,7 +242,7 @@
 
 (test-begin "match")
 
-(test 1.5
+#;(test 1.5
   (bitmatch `#( #x38 #x00  #x00 #x00 #x80 #x3f)
     (((a 16 float) (b 32 float))
       (+ a b))))
