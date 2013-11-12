@@ -139,7 +139,7 @@
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little host bitstring check float double bitpacket signed unsigned)
+  (syntax-rules (big little host bitstring check float double bitpacket signed unsigned boolean)
     ; all patterns take expansion
     ((_ "read" stream handler)
       (and
@@ -179,6 +179,18 @@
     ((_ mode stream handler (NAME bitstring))
       (bitstring-pattern-expand mode stream NAME
         (bitstring-pattern mode stream handler)))
+    ; boolean
+    ((_ mode stream handler (NAME boolean))
+     (bitstring-pattern-expand mode stream NAME 8 (boolean big unsigned)
+       (bitstring-pattern mode stream handler)))
+    ; boolean bits
+    ((_ mode stream handler (NAME BITS boolean))
+     (bitstring-pattern-expand mode stream NAME BITS (boolean big unsigned)
+       (bitstring-pattern mode stream handler)))
+    ; boolean bits endian
+    ((_ mode stream handler (NAME BITS boolean ENDIAN))
+     (bitstring-pattern-expand mode stream NAME BITS (boolean ENDIAN unsigned)
+       (bitstring-pattern mode stream handler)))
     ; double 64
     ((_ mode stream handler (NAME double) rest ...)
       (bitstring-pattern-expand mode stream NAME 64 (float big)
@@ -289,10 +301,10 @@
         (syntax-error "not a symbol name" `name)))
     ((_ "read" stream name bits type continuation)
       (symbol?? name
-      	(and-let* ((tmp (bitstring-read stream bits))
-      	           (name (bitstring-read-expand tmp bits type)))
-      	  ;(print "expand-symbol: " `(name bits type) " rest: " `continuation)      	  
-      	  continuation)
+        (and-let* ((tmp (bitstring-read stream bits)))
+         (let ((name (bitstring-read-expand tmp bits type)))
+           ;(print "expand-symbol: " `(name bits type) " rest: " `continuation)
+           continuation))
         (and-let* ((tmp (bitstring-read stream bits)))
           ;(print "expand-value: " `(name bits type) " rest: " `continuation)
       	  (and
@@ -322,11 +334,13 @@
        (else tmp)))))
 
 (define-syntax bitstring-read-expand
-  (syntax-rules (bitstring float)
+  (syntax-rules (bitstring float boolean)
     ((_ tmp 32 (float ENDIAN))
      (bitstring->single (float-reorder-bytes ENDIAN tmp)))
     ((_ tmp 64 (float ENDIAN))
      (bitstring->double (float-reorder-bytes ENDIAN tmp)))
+    ((_ tmp bits (boolean ENDIAN SIGNED))
+     (not (zero? (bitstring-read-integer tmp bits ENDIAN SIGNED))))
     ((_ tmp bits (ENDIAN SIGNED))
      (bitstring-read-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)
@@ -356,11 +370,13 @@
       (syntax-error "invalid integer attibute" `ENDIAN `SIGNED))))
 
 (define-syntax bitstring-write-expand
-  (syntax-rules (bitstring float)
+  (syntax-rules (bitstring float boolean)
     ((_ tmp 32 (float ENDIAN))
      (float-reorder-bytes ENDIAN (single->bitstring tmp)))
     ((_ tmp 64 (float ENDIAN))
      (float-reorder-bytes ENDIAN (double->bitstring tmp)))
+    ((_ tmp bits (boolean ENDIAN SIGNED))
+     (bitstring-write-integer (if tmp 1 0) bits ENDIAN SIGNED))
     ((_ tmp bits (ENDIAN SIGNED))
       (bitstring-write-integer tmp bits ENDIAN SIGNED))
     ((_ tmp bits bitstring)

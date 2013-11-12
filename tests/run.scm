@@ -354,6 +354,24 @@
 (test `(0 32 #u8( #x6D #xE7 #xFB #xBD)) (get-fields (single->bitstring -0.123)))
 (test-end)
 
+(test-begin "boolean")
+(test #t (bitmatch (bitconstruct (#t boolean))
+           (((B boolean)) B)))
+
+(test #t (bitmatch (bitconstruct (#t 32 boolean))
+           (((B 32 boolean)) B)))
+
+(test #t (bitmatch (bitconstruct (#t 32 boolean little))
+           (((B 32 boolean little)) B)))
+
+(test #f (bitmatch (bitconstruct (#f 16 boolean host))
+           (((B 16 boolean host)) B)
+           (((X bitstring)) X)))
+
+(test (list 1) (bitstring->list (bitconstruct (#t boolean)) 8))
+(test (list 0) (bitstring->list (bitconstruct (#f boolean)) 8))
+(test-end)
+
 (test-end "bitstring")
 
 (test-exit)
