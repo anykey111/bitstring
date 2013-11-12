@@ -15,6 +15,7 @@
    blob->bitstring
    bitstring-read
    bitstring-share
+   bitstring-create
    bitstring-reserve
    bitstring=?
    bitstring-append
@@ -422,6 +423,9 @@
 ; compute space required for {{n}} bits
 (define (space-required n alignment)
   (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1)))
+
+(define (bitstring-create)
+  (bitstring-reserve 128))
 
 (define (bitstring-reserve size-in-bits)
   (let ((size (space-required size-in-bits 8)))
