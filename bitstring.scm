@@ -475,11 +475,11 @@
       (()
        tmp)
       (((value 8 bitstring) (rest bitstring))
-       (u8vector-set! tmp index (bitstring->integer value 'big))
+       (u8vector-set! tmp index (bitstring->integer-big value))
        (loop rest (add1 index) tmp))
       (((value bitstring))
        (let ((len (bitstring-length value))
-             (byte (bitstring->integer value 'big)))
+             (byte (bitstring->integer-big value)))
          (u8vector-set! tmp index (if (eq? zero-extending 'left)
                                     byte
                                     (fxshl byte (- 8 len))))
