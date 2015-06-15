@@ -181,17 +181,17 @@
       (bitstring-pattern-expand mode stream NAME
         (bitstring-pattern mode stream handler)))
     ; boolean
-    ((_ mode stream handler (NAME boolean))
+    ((_ mode stream handler (NAME boolean) rest ...)
      (bitstring-pattern-expand mode stream NAME 8 (boolean big unsigned)
-       (bitstring-pattern mode stream handler)))
+       (bitstring-pattern mode stream handler rest ...)))
     ; boolean bits
-    ((_ mode stream handler (NAME BITS boolean))
+    ((_ mode stream handler (NAME BITS boolean) rest ...)
      (bitstring-pattern-expand mode stream NAME BITS (boolean big unsigned)
-       (bitstring-pattern mode stream handler)))
+       (bitstring-pattern mode stream handler rest ...)))
     ; boolean bits endian
-    ((_ mode stream handler (NAME BITS boolean ENDIAN))
+    ((_ mode stream handler (NAME BITS boolean ENDIAN) rest ...)
      (bitstring-pattern-expand mode stream NAME BITS (boolean ENDIAN unsigned)
-       (bitstring-pattern mode stream handler)))
+       (bitstring-pattern mode stream handler rest ...)))
     ; double 64
     ((_ mode stream handler (NAME double) rest ...)
       (bitstring-pattern-expand mode stream NAME 64 (float big)

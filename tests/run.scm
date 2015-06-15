@@ -368,6 +368,11 @@
            (((B 16 boolean host)) B)
            (((X bitstring)) X)))
 
+(test #(0.0 0.0 #t #t) 
+  (bitmatch (u8vector 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
+    (((a double big)  (b double big) (c boolean) (d boolean))
+     (vector a b c d))))
+
 (test (list 1) (bitstring->list (bitconstruct (#t boolean)) 8))
 (test (list 0) (bitstring->list (bitconstruct (#f boolean)) 8))
 (test-end)
