@@ -142,6 +142,11 @@
       (let ((stream (->bitstring bstr)))
         (bitstring-pattern "read" stream handler pattern ...)))))
 
+(define-syntax bitstring-malformed-pattern
+  (syntax-rules ()
+    ((bitstring-malformed-pattern)
+     (syntax-error "bitstring-malformed-pattern"))))
+
 (define-syntax bitstring-pattern
   (syntax-rules (big little host bitstring check float double bitpacket signed unsigned boolean)
     ; all patterns take expansion
@@ -263,7 +268,7 @@
         (bitstring-pattern-value mode stream handler (NAME) rest ...)))
     ; dismiss other pattern forms
     ((_ mode stream handler . rest)
-      (error "bitstring-malformed-pattern" `mode `stream `handler `rest))))
+     (bitstring-malformed-pattern rest))))
 
 (define-syntax bitstring-pattern-value
   (syntax-rules ()
