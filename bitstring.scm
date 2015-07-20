@@ -47,8 +47,11 @@
    double->bitstring
    list->bitstring)
 
-  (import scheme chicken extras foreign)
-  (require-extension srfi-1 srfi-4)
+  (import scheme chicken extras)
+
+(use bitstring-lowlevel
+     srfi-1
+     srfi-4)
 
 (define-syntax symbol??
   (er-macro-transformer
@@ -570,8 +573,7 @@
 (define (bitstring-not bs)
   (let ((len (bitstring-length bs))
         (tmp (bitstring->u8vector bs 'right)))
-    ((foreign-primitive void ((u8vector data) (int size))
-      "int i; for(i=0;i<size;++i) data[i] = ~data[i];") tmp (u8vector-length tmp))
+    (u8vector-not tmp (u8vector-length tmp))
     (make-bitstring 0 len tmp u8vector-ref u8vector-set!)))
 
 (define (bitstring-bit-set? bs n)
@@ -683,22 +685,6 @@
       	    (if (or (zero? i))
       	      (* f (expt 2 e) (if (zero? signbit) 1. -1.))
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
-
-(define float->uint32
-  (foreign-lambda* void ((u8vector i) (float f))
-    "*(uint32_t*)i = *(uint32_t*)&f;"))
-
-(define double->uint64
-  (foreign-lambda* void ((u8vector i) (double d))
-    "*(uint64_t*)i = *(uint64_t*)&d;"))
-
-(define uint32->float
-  (foreign-lambda* float ((blob i))
-    "C_return(*(float*)i);"))
-
-(define uint64->double
-  (foreign-lambda* double ((blob i))
-    "C_return(*(double*)i);"))
     
 (define (single->bitstring value)
     (let ((buf (make-u8vector 4)))
