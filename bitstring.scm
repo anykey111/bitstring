@@ -231,7 +231,10 @@
     ((_ mode stream handler (NAME float ENDIAN) rest ...)
       (bitstring-pattern-expand mode stream NAME 32 (float ENDIAN)
         (bitstring-pattern mode stream handler rest ...)))
-    ; float bits
+    ; generic float bits
+    ((_ mode stream handler (NAME BITS float) rest ...)
+     (bitstring-pattern-expand mode stream NAME BITS (float big)
+       (bitstring-pattern mode stream handler rest ...)))
     ((_ mode stream handler (NAME BITS float ENDIAN) rest ...)
       (bitstring-pattern-expand mode stream NAME BITS (float ENDIAN)
         (bitstring-pattern mode stream handler rest ...)))
