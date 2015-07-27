@@ -139,3 +139,14 @@
     (bitstring->f32vector
       (bitconstruct (Line bitpacket)))))
 
+; Example 4.2 Using bitpacket constructor
+
+; Special syntax (bitpacket (packet-name constructor-name) fields ...)
+(bitpacket (Point3D make-Point3D)
+  (x float host)
+  (y float host)
+  (z float host))
+
+; make-Point3D just syntax sugar for '(let (args ...) (bitconstruct (Point3D bitpacket)))'
+(print "Point3D: " (bitstring->f32vector
+                     (make-Point3D (x 0.0) (y -1.0) (z 1.0))))

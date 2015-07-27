@@ -241,6 +241,14 @@
                                (line.end.x 3)
                                (line.end.y 4))
                            (bitstring->string (bitconstruct (line Line bitpacket)))))
+; bitpacket constructor
+(bitpacket (Point3D make-Point3D)
+  (x float host)
+  (y float host)
+  (z float host))
+(test (f32vector 0.0 -1.0 1.0)
+      (blob->f32vector (bitstring->blob (make-Point3D (x 0.0) (y -1.0) (z 1.0)))))
+
 (test-end)
 
 (test-begin "->bitstring")

@@ -77,7 +77,7 @@
           ((integer? name) integer-branch)
           (else (error "invalid value" `name)))))))
 
-(define-syntax bitpacket
+(define-syntax bitpacket-def-fields
   (syntax-rules ()
     ((_ name fields ...)
       (define-syntax name
@@ -111,6 +111,20 @@
                                                (map (lambda (pat) (rename-with-prefix prefix pat)) '(fields ...))
                                                '(fields ...))
                                           ,rest))))))))
+
+(define-syntax bitpacket
+  (syntax-rules ()
+    ((_ (name constructor) fields ...)
+     (begin
+       (bitpacket-def-fields name fields ...)
+       (define-syntax constructor
+         (syntax-rules ()
+           ((_ . args)
+            (let args
+              (bitconstruct (name bitpacket))))))))
+    ((_ name fields ...)
+     (bitpacket-def-fields name fields ...))))
+
 
 (define-syntax bitstring-pattern-continue
   (syntax-rules ()
