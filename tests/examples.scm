@@ -1,3 +1,6 @@
+(use bitstring)
+(use srfi-4)
+
 ; Example 1. Tagged data structure.
 ;
 ; struct Tagged {
@@ -9,8 +12,6 @@
 ;  };
 ; };
 ;
-
-(use bitstring)
 
 ; The following will print "integer:3721182122",
 ; which is the decimal value of #xDDCCBBAA
@@ -27,8 +28,6 @@
 ;  char StringData[0];
 ; };
 ;
-
-(use bitstring)
 
 ; This will print "StringData:(65 66 67 68 69)"
 ; First it reads the length byte of 5, bind it to Length and
@@ -112,3 +111,31 @@
     (#\X)))
 
 (print (construct-complex-object))
+
+
+; Example 4.1 Using bitpacket for better code reuse
+
+(bitpacket Point (x float host)
+                 (y float host))
+
+(bitpacket Line (start Point bitpacket)
+                (end   Point bitpacket))
+
+; parse array of line coordinates
+(bitmatch (f32vector->blob (f32vector 0.5 -0.5 1.0 0.0))
+  (((Line bitpacket))
+    (print "start x: " start.x " y: " start.y " x2: " end.x " y2: " end.y)))
+
+; create line coordinate
+(define (bitstring->f32vector bs)
+  (blob->f32vector (bitstring->blob bs)))
+
+; construct Line
+(let ((start.x 1.0)
+      (start.y 2.0)
+      (end.x -1.0)
+      (end.y -2.0))
+  (print "Line: "
+    (bitstring->f32vector
+      (bitconstruct (Line bitpacket)))))
+

@@ -2,8 +2,6 @@
 ; Basic TGA image parser.
 ; Support True-Image type format and Run-Length-Encoding compression.
 ; SPEC: http://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
-;
-; WARNING!!! bitpacket feature is experimental !!!
 
 (use bitstring posix srfi-4)
 
