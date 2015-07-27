@@ -81,19 +81,36 @@
   (syntax-rules ()
     ((_ name fields ...)
       (define-syntax name
-      	(er-macro-transformer
-      	  ;; (name (mode stream handler) args ...)
-      	  (lambda (e r c)
-      	    (let* ((context (cadr e))
-                   (mode (first context))
-                   (stream (second context))
-                   (handler (third context))
-      	    	     (args (cddr e)))
-      	      ;; inline packet fields
-              ;(print "inline:" mode stream handler " fields:" `(fields ...) " args:" args)
-      	      `(bitstring-pattern-continue ,mode ,stream ,handler (fields ...) ,args)))
-                  
-      	  )))))
+        (er-macro-transformer
+         ;;(name mode stream handler PREFIX rest ...)
+         (lambda (e r c)
+           (define (rename-with-prefix prefix pat)
+             (let* ((n (length pat))
+                    (rename (lambda (sym)
+                              (string->symbol (string-append (symbol->string prefix)
+                                                             "." (symbol->string sym))))))
+               (or (>= n 1)
+                   (syntax-error "invalid bitpacket field pattern" pat))
+               (cond ((and (>= n 1) (symbol? (first pat)))
+                      (cons (rename (first pat)) (cdr pat)))
+                     (else pat))))
+           (let* ((args    (cdr    e))
+                  (mode    (first  args))
+                  (stream  (second args))
+                  (handler (third  args))
+                  (prefix  (fourth args))
+                  (rest    (drop   args 4)))
+             (or (symbol? prefix)
+                 (equal? prefix #f)
+                 (syntax-error "invalid bitpacket prefix" prefix))
+             ;; inline bitpacket fields
+             `(bitstring-pattern-continue ,mode
+                                          ,stream
+                                          ,handler
+                                          ,(if prefix
+                                               (map (lambda (pat) (rename-with-prefix prefix pat)) '(fields ...))
+                                               '(fields ...))
+                                          ,rest))))))))
 
 (define-syntax bitstring-pattern-continue
   (syntax-rules ()
@@ -176,10 +193,10 @@
         (bitstring-pattern "write" stream handler (tmp bits bitstring) rest ...)))
     ; bitpacket
     ((_ mode stream handler (NAME bitpacket) rest ...)
-      (bitstring-packet-expand mode stream handler NAME rest ...))
-    ; bitpacket at tail
-    ((_ mode stream handler (NAME bitpacket))
-      (bitstring-packet-expand mode stream handler NAME))
+      (NAME mode stream handler #f rest ...))
+    ; bitpacket with prefix
+    ((_ mode stream handler (PREFIX NAME bitpacket) rest ...)
+     (NAME mode stream handler PREFIX rest ...))
     ; allow in bitconstruct dont type length
     ((_ "write" stream handler (NAME bitstring) rest ...)
       (bitstring-pattern-expand "write" stream NAME
@@ -281,13 +298,6 @@
           (VALUE (* 8 (string-length VALUE)) bitstring) rest ...)
         ; integer
         (bitstring-pattern mode stream handler (VALUE 8 big) rest ...)))))
-
-(define-syntax bitstring-packet-expand
-  (syntax-rules ()
-    ((_ mode stream handler name)
-      (name (mode stream handler)))
-    ((_ mode stream handler name rest ...)
-      (name (mode stream handler) rest ...))))
 
 (define-syntax bitstring-pattern-expand
   (syntax-rules ()

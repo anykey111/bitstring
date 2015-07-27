@@ -217,6 +217,30 @@
     (((PacketX bitpacket)) (+ 1 ValueX))
     (((PacketY bitpacket)) (+ 2 ValueY))
     (((PacketZ bitpacket)) (+ 3 ValueZ))))
+
+;;bitpacket with prefix
+(bitpacket Point (x 8) (y 8))
+
+(test 5 (bitmatch "\x01\x02\x03\x04"
+          (((p1 Point bitpacket) (p2 Point bitpacket))
+           (+ p1.x p2.y))))
+
+(bitpacket Line (start Point bitpacket)
+                (end Point bitpacket))
+
+(test 5 (bitmatch "\x01\x02\x03\x04"
+          (((Line bitpacket))
+           (+ start.x end.y))))
+
+(test 5 (bitmatch "\x01\x02\x03\x04"
+          (((line Line bitpacket))
+           (+ line.start.x line.end.y))))
+
+(test "\x01\x02\x03\x04" (let ((line.start.x 1)
+                               (line.start.y 2)
+                               (line.end.x 3)
+                               (line.end.y 4))
+                           (bitstring->string (bitconstruct (line Line bitpacket)))))
 (test-end)
 
 (test-begin "->bitstring")
@@ -368,7 +392,7 @@
            (((B 16 boolean host)) B)
            (((X bitstring)) X)))
 
-(test #(0.0 0.0 #t #t) 
+(test (vector 0.0 0.0 #t #t)
   (bitmatch (u8vector 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
     (((a double big)  (b double big) (c boolean) (d boolean))
      (vector a b c d))))
