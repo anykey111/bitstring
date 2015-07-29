@@ -423,6 +423,25 @@
 
 (test-end)
 
+(test-begin "offset")
+(test 32 (bitmatch "ABCD" (((start offset) ("ABCD") (end offset)) (- end start))))
+(test 6 (bitmatch "X" (((_ 1) (start offset) (_ 6) (end offset) (_ 1)) (- end start))))
+(test 5 (bitmatch "X" (((_ 3) (rest bitstring))
+                       (bitmatch rest (((start offset) (_ 5) (end offset)) (- end start))))))
+(test (list 3 8)
+      (bitmatch "X" (((_ 3) (rest bitstring))
+                     (bitmatch rest (((start offset) (_ 5) (end offset)) (list start end))))))
+(test-end)
+
+(test-begin "seek")
+(test #t (bitmatch "ABC" ((("A") (-8 seek) ("ABC")) #t)))
+(test #t (bitmatch "ABC" (((+8 seek) ("BC")) #t)))
+(test #t (bitmatch "ABC" (((0 seek) ("ABC")) #t)))
+(test #t (bitmatch "ABC" (((-0 seek) ("ABC")) #t)))
+(test-error (bitmatch "ABC" ((("A") (-16 seek) (rest bitstring)) #t)))
+(test-error (bitmatch "ABC" ((("A") (+20 seek) (rest bitstring)) #t)))
+(test-end)
+
 (test-end "bitstring")
 
 (test-exit)

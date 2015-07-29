@@ -15,6 +15,7 @@
    blob->bitstring
    bitstring-read
    bitstring-share
+   bitstring-seek
    bitstring-create
    bitstring-reserve
    bitstring=?
@@ -179,7 +180,7 @@
      (syntax-error "bitstring-malformed-pattern"))))
 
 (define-syntax bitstring-pattern
-  (syntax-rules (big little host bitstring check float double bitpacket signed unsigned boolean)
+  (syntax-rules (big little host bitstring check float double bitpacket signed unsigned boolean offset seek)
     ; all patterns take expansion
     ((_ "read" stream handler)
       (and
@@ -212,6 +213,14 @@
                 (bits (first res)) ; length
                 (name (second res))) ; value
        (bitstring-pattern "read" stream handler (tmp bits bitstring) rest ...)))
+    ; tell current stream offset
+    ((_ "read" stream handler (NAME offset) rest ...)
+     (let ((NAME (bitstring-start stream)))
+       (bitstring-pattern "read" stream handler rest ...)))
+    ; move current stream offset
+    ((_ "read" stream handler (OFFS seek) rest ...)
+     (and-let* ((with-offset (bitstring-seek stream OFFS)))
+       (bitstring-pattern "read" with-offset handler rest ...)))
     ; bitpacket
     ((_ mode stream handler (NAME bitpacket) rest ...)
       (NAME mode stream handler #f rest ...))
@@ -743,7 +752,14 @@
 
 (define (bitstring-share bs from to)
   (make-bitstring from to (bitstring-buffer bs) (bitstring-getter bs) (bitstring-setter bs)))
-   
+
+(define (bitstring-seek bs offs)
+  (let ((from (+ (bitstring-start bs) offs))
+        (to (bitstring-end bs)))
+    (and (<= 0 from)
+         (<= from to)
+         (bitstring-share bs from to))))
+
 (define (bitstring-read bs n)
   (let ((from (bitstring-start bs))
         (to (+ (bitstring-start bs) n)))
@@ -761,7 +777,7 @@
       	((string? buffer)
       	  (string-length buffer))
       	(else
-      	  (abort "not implemented for this buffer type"))))))
+      	  (error "not implemented for this buffer type"))))))
 
 (define (bitstring-buffer-resize bs size-in-bits)
   (let* ((new-size (space-required size-in-bits 32))
