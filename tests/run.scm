@@ -409,6 +409,20 @@
 (test (list 0) (bitstring->list (bitconstruct (#f boolean)) 8))
 (test-end)
 
+(test-begin "reader proc")
+
+(define (zterminated-string bs)
+  (let loop ((n 8) (acc '()))
+    (bitmatch (or (bitstring-read bs 8) "")
+      (() -> #f) ; end of stream
+      ((0) -> (list n (list->string (reverse acc))))
+      ((c) -> (loop (+ n 8) (cons (integer->char c) acc))))))
+(test "BC" (bitmatch "ABC\x00" ((("A") ((str zterminated-string) bitstring)) str)))
+(test-error (bitmatch "ABC" ((("A") ((str zterminated-string) bitstring)) str)))
+(test #f (bitmatch "ABC" ((("A") ((str zterminated-string) bitstring)) str) (else #f)))
+
+(test-end)
+
 (test-end "bitstring")
 
 (test-exit)

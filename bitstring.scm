@@ -205,6 +205,13 @@
       (and-let* ((tmp (VALUE ...))
                  (bits (bitstring-length tmp)))
         (bitstring-pattern "write" stream handler (tmp bits bitstring) rest ...)))
+    ; evaluate reader procedure (PROC) -> returns #f or (list num-bits-readed any-value)
+    ((_ "read" stream handler ((name PROC ...) bitstring) rest ...)
+     (and-let* ((tmp (->bitstring stream))
+                (res (PROC ... tmp))
+                (bits (first res)) ; length
+                (name (second res))) ; value
+       (bitstring-pattern "read" stream handler (tmp bits bitstring) rest ...)))
     ; bitpacket
     ((_ mode stream handler (NAME bitpacket) rest ...)
       (NAME mode stream handler #f rest ...))
