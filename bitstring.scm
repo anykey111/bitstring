@@ -145,32 +145,29 @@
 
 (define-syntax bitmatch
   (syntax-rules ()
-    ((_ value patterns ...)
+    ((_ value . patterns)
       ;; invoke user code with captured variables
       ((let ((bstr (->bitstring value)))
-        (or (bitmatch-pattern-list bstr patterns ...)))))))
+        (bitmatch-pattern-list bstr patterns))))))
 
 (define-syntax bitmatch-pattern-list
   (syntax-rules (else ->)
-    ((_ bstr (else handler ...))
-      (capture-handler (handler ...)))
-    ((_ bstr (pattern ... -> handler) rest ...)
-      (bitmatch-pattern-list bstr ((pattern ...) handler) rest ...))
-    ((_ bstr (pattern ... -> handler ...) rest ...)
-      (bitmatch-pattern-list bstr ((pattern ...) handler ...) rest ...))
-    ((_ bstr ((pattern ...) handler ...))
-      (or
-        (bitmatch-pattern bstr (handler ...) pattern ...)
-        (error 'bitstring-match-failure)))
-    ((_ bstr ((pattern ...) handler ...) rest ...)
-      (or
-        (bitmatch-pattern bstr (handler ...) pattern ...)
-        (bitmatch-pattern-list bstr rest ...)))))
+    ((_ bstr ())
+      (error 'bitstring-match-failure))
+    ((_ bstr ((else . handler)))
+      (capture-handler handler))
+    ; short syntax form (pat ... patX -> exp)
+    ((_ bstr ((pattern ... -> handler) . rest))
+      (or (bitmatch-pattern bstr (handler) (pattern ...))
+          (bitmatch-pattern-list bstr rest)))
+    ((_ bstr ((pattern . handler) . rest))
+      (or (bitmatch-pattern bstr handler pattern)
+          (bitmatch-pattern-list bstr rest)))))
 
 (define-syntax bitmatch-pattern
   (syntax-rules ()
-    ((_ bstr handler pattern ...)
-      ; share bitstring instance
+    ((_ bstr handler (pattern ...))
+      ; shared copy of bitstring instance
       (let ((stream (->bitstring bstr)))
         (bitstring-pattern "read" stream handler pattern ...)))))
 
