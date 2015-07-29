@@ -150,3 +150,29 @@
 ; make-Point3D just syntax sugar for '(let (args ...) (bitconstruct (Point3D bitpacket)))'
 (print "Point3D: " (bitstring->f32vector
                      (make-Point3D (x 0.0) (y -1.0) (z 1.0))))
+
+; Example 5. Reader procedure
+
+; Pattern: ((Name reader-proc) bitstring)
+; Signature: (reader-proc bitstring) -> returns #f or (list num-bits-consumed user-value)
+
+; C string reader
+(define (cstring-reader bs)
+  (let loop ((n 8) (acc '()) (rest bs))
+    (bitmatch rest
+      ; end of stream (fail!)
+      (() #f)
+      ; zero-terminator (success!)
+      (((0) (rest bitstring))
+        (list n ; number of bits consumed
+              (list->string (reverse acc)))) ; result string
+      ; continue
+      (((c) (rest bitstring))
+        (loop (+ n 8) ; accumulate length
+              (cons (integer->char c) acc); save char
+              rest))))) ; inspect rest of stream
+
+(bitmatch "Kernighan\x00Ritchie\x00"
+  ((((s1 cstring-reader) bitstring)
+    ((s2 cstring-reader) bitstring))
+   (print (string-append s1 " and " s2))))
