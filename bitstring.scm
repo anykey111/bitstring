@@ -20,7 +20,7 @@
    bitstring-reserve
    bitstring=?
    bitstring-append
-   bitstring-append! 
+   bitstring-append!
    bitstring-not
    bitstring-bit-set?
    bitstring-reverse
@@ -467,7 +467,7 @@
 
 (define (bitstring-length bs)
   (- (bitstring-end bs) (bitstring-start bs)))
-  
+
 ; compute space required for {{n}} bits
 (define (space-required n alignment)
   (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1)))
@@ -516,22 +516,22 @@
   (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
 
 (define (bitstring->u8vector bs #!optional (zero-extending 'left))
-  (let loop ((data bs)
+  (let loop ((bs (->bitstring bs)) ; make copy for mutable bitstring-read
+             (n (bitstring-length bs))
              (index 0)
              (tmp (make-u8vector (space-required (bitstring-length bs) 8))))
-    (bitmatch data
-      (()
-       tmp)
-      (((value 8 bitstring) (rest bitstring))
-       (u8vector-set! tmp index (bitstring->integer-big value))
-       (loop rest (add1 index) tmp))
-      (((value bitstring))
-       (let ((len (bitstring-length value))
-             (byte (bitstring->integer-big value)))
-         (u8vector-set! tmp index (if (eq? zero-extending 'left)
-                                    byte
-                                    (fxshl byte (- 8 len))))
-         tmp)))))
+    (cond
+      ((zero? n)
+        tmp)
+      ((< n 8)
+       (let ((byte (bitstring->integer-big (bitstring-read bs n))))
+          (u8vector-set! tmp index (if (eq? zero-extending 'left)
+                                        byte
+                                       (fxshl byte (- 8 n))))
+          tmp))
+      (else
+         (u8vector-set! tmp index (bitstring->integer-big (bitstring-read bs 8)))
+         (loop bs (- n 8) (add1 index) tmp)))))
 
 (define (bitstring->string bs)
   (list->string (map integer->char (bitstring->list bs 8))))
@@ -543,15 +543,17 @@
   (bitstring->listn bs bits endian))
 
 (define (bitstring->listn bs bits endian)
-  (let loop ((data bs)
+  (let loop ((bs (->bitstring bs)); make copy for mutable bitstring-read
+             (n (bitstring-length bs))
              (acc (list)))
-    (bitmatch data
-      (()
-        (reverse acc))
-      (((value bits bitstring) (rest bitstring))
-        (loop rest (cons (bitstring->integer value endian) acc)))
-      (((rest-value bitstring))
-        (loop "" (cons (bitstring->integer rest-value endian) acc))))))
+    (cond ((zero? n)
+           (reverse acc))
+          ((< n bits)
+           (loop bs 0
+               (cons (bitstring->integer (bitstring-read bs n) endian) acc)))
+          (else
+           (loop bs (- n bits)
+               (cons (bitstring->integer (bitstring-read bs bits) endian) acc))))))
 
 (define (list->bitstring lst #!optional (bits 1) (endian 'big))
   (let loop ((rest lst)
@@ -730,7 +732,7 @@
       	    (if (or (zero? i))
       	      (* f (expt 2 e) (if (zero? signbit) 1. -1.))
       	      (loop (- i 1) (/ s 2) (if (zero? b) f (+ f s))))))))))
-    
+
 (define (single->bitstring value)
     (let ((buf (make-u8vector 4)))
         (float->uint32 buf value)
@@ -805,7 +807,7 @@
     args))
 
 (define (bitstring-append! dst . args)
-  (fold                      
+  (fold
     (lambda (bs acc)
       (bitstring-append2! acc bs))
     dst
@@ -829,7 +831,7 @@
   (let* ((position (bitstring-end bs))
          (index (quotient position 8))
          (drift (remainder position 8)))
-    (if (zero? drift) 
+    (if (zero? drift)
       ; store aligned
       (begin
         (bitstring-store-byte bs index value)
