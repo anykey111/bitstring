@@ -132,10 +132,13 @@
     ((_ mode stream handler (fields ...) (rest ...))
       (bitstring-pattern mode stream handler fields ... rest ...))))
 
-(define-syntax capture-handler
-  (syntax-rules ()
-    ((_ (handler ...))
-      (lambda () handler ...))))
+(define-syntax make-bitmatch-result
+  (syntax-rules () ((_ (handler ...))
+                    (list (begin handler ...)))))
+
+(define-syntax bitmatch-result
+  (syntax-rules () ((_ result)
+                    (car result))))
 
 (define-syntax bitconstruct
   (syntax-rules ()
@@ -146,16 +149,15 @@
 (define-syntax bitmatch
   (syntax-rules ()
     ((_ value . patterns)
-      ;; invoke user code with captured variables
-      ((let ((bstr (->bitstring value)))
-        (bitmatch-pattern-list bstr patterns))))))
+      (let ((bstr (->bitstring value)))
+        (bitmatch-result (bitmatch-pattern-list bstr patterns))))))
 
 (define-syntax bitmatch-pattern-list
   (syntax-rules (else ->)
     ((_ bstr ())
       (error 'bitstring-match-failure))
     ((_ bstr ((else . handler)))
-      (capture-handler handler))
+      (make-bitmatch-result handler))
     ; short syntax form (pat ... patX -> exp)
     ((_ bstr ((pattern ... -> handler) . rest))
       (or (bitmatch-pattern bstr (handler) (pattern ...))
@@ -183,14 +185,14 @@
       (and
         ; ensure that no more bits left
         (zero? (bitstring-length stream))
-        (capture-handler handler)))
+        (make-bitmatch-result handler)))
     ((_ "write" stream handler)
       stream)
     ; zero-length bitstring
     ((_ "read" stream handler ())
       (and
         (zero? (bitstring-length stream))
-        (capture-handler handler)))
+        (make-bitmatch-result handler)))
     ((_ "write" stream handler ())
       stream)
     ; user guard expression
@@ -345,7 +347,7 @@
       (symbol?? name
       	(and-let* ((bits (bitstring-length stream))
       	           (name (bitstring-read stream bits)))
-          ;(print "read-expand: " `(name bits type) " rest: " `continuation)         
+          ;(print "read-expand: " `(name bits type) " rest: " `continuation)
       	  continuation)
         (syntax-error "not a symbol name" `name)))
     ((_ "read" stream name bits type continuation)
