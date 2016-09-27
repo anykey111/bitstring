@@ -510,10 +510,6 @@
     (else
       (error "bitstring-invalid-value" x))))
 
-(define (bitstring-size-in-bytes bs)
-  (let ((n (bitstring-length bs)))
-    (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1))))
-
 (define (bitstring->blob bs #!optional (zero-extending 'left))
   (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
 
