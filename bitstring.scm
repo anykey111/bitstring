@@ -471,14 +471,14 @@
   (- (bitstring-end bs) (bitstring-start bs)))
 
 ; compute space required for {{n}} bits
-(define (space-required n alignment)
+(define (space-required n)
   (+ (quotient n 8) (if (zero? (remainder n 8)) 0 1)))
 
 (define (bitstring-create)
   (bitstring-reserve 128))
 
 (define (bitstring-reserve size-in-bits)
-  (let ((size (space-required size-in-bits 8)))
+  (let ((size (space-required size-in-bits)))
     (make-bitstring 0 0 (make-u8vector size 0) u8vector-ref u8vector-set!)))
 
 (define (string->bitstring s)
@@ -517,7 +517,7 @@
   (let loop ((bs (->bitstring bs)) ; make copy for mutable bitstring-read
              (n (bitstring-length bs))
              (index 0)
-             (tmp (make-u8vector (space-required (bitstring-length bs) 8))))
+             (tmp (make-u8vector (space-required (bitstring-length bs)))))
     (cond
       ((zero? n)
         tmp)
@@ -777,7 +777,7 @@
       	  (error "not implemented for this buffer type"))))))
 
 (define (bitstring-buffer-resize bs size-in-bits)
-  (let* ((new-size (space-required size-in-bits 32))
+  (let* ((new-size (space-required size-in-bits))
          (tmp (make-u8vector new-size 0))
          (used (bitstring-buffer-size bs)))
     (let copy ((i 0)
