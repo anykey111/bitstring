@@ -345,22 +345,17 @@
       	continuation))
     ((_ "read" stream name continuation) ; read all rest bytes
       (symbol?? name
-      	(and-let* ((bits (bitstring-length stream))
-      	           (name (bitstring-read stream bits)))
+      	(and-let* ((name (bitstring-read stream (bitstring-length stream))))
           ;(print "read-expand: " `(name bits type) " rest: " `continuation)
       	  continuation)
         (syntax-error "not a symbol name" `name)))
     ((_ "read" stream name bits type continuation)
-      (symbol?? name
-        (and-let* ((tmp (bitstring-read stream bits)))
-         (let ((name (bitstring-read-expand tmp bits type)))
-           ;(print "expand-symbol: " `(name bits type) " rest: " `continuation)
-           continuation))
-        (and-let* ((tmp (bitstring-read stream bits)))
-          ;(print "expand-value: " `(name bits type) " rest: " `continuation)
-      	  (and
-            (optimize-compare tmp name bits type)
-      	    continuation))))))
+      (and-let* ((tmp (bitstring-read stream bits)))
+             (symbol?? name
+               (let ((name (bitstring-read-expand tmp bits type)))
+                  continuation)
+               (and (optimize-compare tmp name bits type)
+                    continuation))))))
 
 (define-syntax optimize-compare
   (syntax-rules ()
