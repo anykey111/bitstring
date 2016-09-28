@@ -170,7 +170,7 @@
   (syntax-rules ()
     ((_ bstr handler (pattern ...))
       ; shared copy of bitstring instance
-      (let ((stream (->bitstring bstr)))
+      (let ((stream (bitstring-share bstr (bitstring-start bstr) (bitstring-end bstr))))
         (bitstring-pattern "read" stream handler pattern ...)))))
 
 (define-syntax bitstring-malformed-pattern
@@ -514,7 +514,8 @@
   (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
 
 (define (bitstring->u8vector bs #!optional (zero-extending 'left))
-  (let loop ((bs (->bitstring bs)) ; make copy for mutable bitstring-read
+             ; make bs copy for mutable bitstring-read
+  (let loop ((bs (bitstring-share bs (bitstring-start bs) (bitstring-end bs)))
              (n (bitstring-length bs))
              (index 0)
              (tmp (make-u8vector (space-required (bitstring-length bs)))))
