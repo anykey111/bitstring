@@ -1,5 +1,3 @@
-;; bitstirng module implements the subset of Erlang bit syntax.
-
 (module bitstring
   (bitmatch
    bitpacket
@@ -76,7 +74,7 @@
           ((char? name) char-branch)
           ((string? name) string-branch)
           ((integer? name) integer-branch)
-          (else (error "invalid value" `name)))))))
+          (else (error "(bitstring) invalid value" `name)))))))
 
 (define-syntax bitpacket-def-fields
   (syntax-rules ()
@@ -91,7 +89,7 @@
                               (string->symbol (string-append (symbol->string prefix)
                                                              "." (symbol->string sym))))))
                (or (>= n 1)
-                   (syntax-error "invalid bitpacket field pattern" pat))
+                   (syntax-error "(bitstring) invalid bitpacket field pattern" pat))
                (cond ((and (>= n 1) (symbol? (first pat)))
                       (cons (rename (first pat)) (cdr pat)))
                      (else pat))))
@@ -103,7 +101,7 @@
                   (rest    (drop   args 4)))
              (or (symbol? prefix)
                  (equal? prefix #f)
-                 (syntax-error "invalid bitpacket prefix" prefix))
+                 (syntax-error "(bitstring) invalid bitpacket prefix" prefix))
              ;; inline bitpacket fields
              `(bitstring-pattern-continue ,mode
                                           ,stream
@@ -155,7 +153,8 @@
 (define-syntax bitmatch-pattern-list
   (syntax-rules (else ->)
     ((_ bstr ())
-      (error 'bitstring-match-failure))
+      (error "(bitstring) no matching pattern"
+             (list 'offset (bitstring-start bstr))))
     ((_ bstr ((else . handler)))
       (make-bitmatch-result handler))
     ; short syntax form (pat ... patX -> exp)
@@ -172,11 +171,6 @@
       ; shared copy of bitstring instance
       (let ((stream (bitstring-share bstr (bitstring-start bstr) (bitstring-end bstr))))
         (bitstring-pattern "read" stream handler pattern ...)))))
-
-(define-syntax bitstring-malformed-pattern
-  (syntax-rules ()
-    ((bitstring-malformed-pattern)
-     (syntax-error "bitstring-malformed-pattern"))))
 
 (define-syntax bitstring-pattern
   (syntax-rules (big little host bitstring check float double bitpacket signed unsigned boolean offset seek)
@@ -317,7 +311,7 @@
         (bitstring-pattern-value mode stream handler (NAME) rest ...)))
     ; dismiss other pattern forms
     ((_ mode stream handler . rest)
-     (bitstring-malformed-pattern rest))))
+     (syntax-error "(bitstring) malformed pattern" `rest))))
 
 (define-syntax bitstring-pattern-value
   (syntax-rules ()
@@ -348,7 +342,7 @@
       	(and-let* ((name (bitstring-read stream (bitstring-length stream))))
           ;(print "read-expand: " `(name bits type) " rest: " `continuation)
       	  continuation)
-        (syntax-error "not a symbol name" `name)))
+        (syntax-error "(bitstring) not a symbol name" `name)))
     ((_ "read" stream name bits type continuation)
       (and-let* ((tmp (bitstring-read stream bits)))
              (symbol?? name
@@ -413,7 +407,7 @@
     ((_ tmp bits host unsigned)
       (bitstring->integer-host tmp))
     ((_ tmp bits ENDIAN SIGNED)
-      (syntax-error "invalid integer attibute" `ENDIAN `SIGNED))))
+      (syntax-error "(bitstring) invalid integer attibute" `ENDIAN `SIGNED))))
 
 (define-syntax bitstring-write-expand
   (syntax-rules (bitstring float boolean)
@@ -445,7 +439,7 @@
     ((_ tmp bits host unsigned)
       (integer->bitstring-host tmp bits))
     ((_ tmp bits ENDIAN SIGNED)
-      (syntax-error "invalid integer attibute" `ENDIAN `SIGNED))))
+      (syntax-error "(bitstring) invalid integer attibute" `ENDIAN `SIGNED))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -503,7 +497,7 @@
     ((blob? x)
       (u8vector->bitstring (blob->u8vector/shared x)))
     (else
-      (error "bitstring-invalid-value" x))))
+      (error "(bitstring) not implemented for this value type" x))))
 
 (define (bitstring->blob bs #!optional (zero-extending 'left))
   (u8vector->blob/shared (bitstring->u8vector bs zero-extending)))
@@ -627,7 +621,7 @@
            (bit-index (- 7 (remainder index 8))))
       (if (and (<= start index) (< index end))
         (bit-set? (bitstring-load-byte bs byte-index) bit-index)
-        (error "out of range" start end n)))))
+        (error "(bitstring) out of range" start end n)))))
 
 (define (bitstring->integer-big bs)
   (bitstring-fold
@@ -677,7 +671,7 @@
     ((host)
       (bitstring->integer-host bitstring))
     (else
-      (error "invalid endian value" `endian))))
+      (error "(bitstring) invalid endian value" `endian))))
 
 (define bitstring->integer-host
   (cond-expand
@@ -770,7 +764,7 @@
       	((string? buffer)
       	  (string-length buffer))
       	(else
-      	  (error "not implemented for this buffer type"))))))
+      	  (error "(bitstring) not implemented for this buffer type"))))))
 
 (define (bitstring-buffer-resize bs size-in-bits)
   (let* ((new-size (space-required size-in-bits))
