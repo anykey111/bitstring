@@ -1,6 +1,12 @@
 (module bitstring-lowlevel
         (u8vector-not float->uint32 double->uint64 uint32->float uint64->double)
-        (import scheme chicken foreign)
+        (import scheme)
+
+(cond-expand
+    (chicken-4
+      (import foreign))
+    (chicken-5
+      (import (chicken foreign))))
 
 (define u8vector-not
    (foreign-primitive void ((u8vector data) (int size))

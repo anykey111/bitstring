@@ -1,4 +1,7 @@
-(use srfi-4 bitstring test)
+(import scheme)
+(cond-expand
+  (chicken-4 (use srfi-4 bitstring test))
+  (chicken-5 (import (chicken blob) srfi-1 srfi-4 bitstring test)))
 
 (current-test-epsilon .01)
 

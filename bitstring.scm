@@ -46,11 +46,25 @@
    double->bitstring
    list->bitstring)
 
-  (import scheme chicken extras)
+  (import scheme)
 
-(use bitstring-lowlevel
-     srfi-1
-     srfi-4)
+  (cond-expand
+    (chicken-4
+      (import chicken extras foreign)
+      (use srfi-1 srfi-4 bitstring-lowlevel))
+    (chicken-5
+      (import
+        (chicken base)
+        (chicken bitwise)
+        (chicken blob)
+        (chicken condition)
+        (chicken fixnum)
+        (chicken foreign)
+        (chicken format)
+        srfi-1
+        srfi-4
+        bitstring-lowlevel)
+      (define bit-set? bit->boolean)))
 
 (define-syntax symbol??
   (er-macro-transformer
@@ -648,7 +662,7 @@
     (if (<= count start)
       bs
       (let ((x (bitwise-and (arithmetic-shift value (- start)) 255)))
-        (bitstring-store-byte bs (quotient start 8) (fxshl x (- 8 n)))
+        (bitstring-store-byte bs (quotient start 8) (fxand #xFF (fxshl x (- 8 n))))
         (loop (+ start n) (min (- count start n) 8) bs)))))
 
 (define (integer->bitstring-big value count)
@@ -831,7 +845,7 @@
         (bitstring-store-byte bs index (fxior byte-src byte-dst))
       	; store rest bits if didnt fit in current byte
       	(if (< restbits nbits)
-          (bitstring-store-byte bs (+ index 1) (fxshl value restbits)))
+          (bitstring-store-byte bs (+ index 1) (fxand #xFF (fxshl value restbits))))
         (bitstring-end-set! bs (+ position nbits))))
     bs));return bitstring
 

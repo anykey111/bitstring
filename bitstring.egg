@@ -1,0 +1,10 @@
+((license "BSD")
+ (category parsing)
+ (dependencies srfi-1)
+ (test-dependencies test)
+ (author "rivo")
+ (synopsis "Binary pattern matching")
+ (components (extension bitstring
+                        (csc-options -O3 -d1))
+             (extension bitstring-lowlevel
+                        (csc-options -O3 -d1))))
