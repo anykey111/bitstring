@@ -1,5 +1,7 @@
-(use bitstring)
-(use srfi-4)
+(import scheme)
+(cond-expand
+ (chicken-4 (use bitstring srfi-4))
+ (chicken-5 (import bitstring srfi-4)))
 
 ; Example 1. Tagged data structure.
 ;
@@ -41,8 +43,6 @@
 
 ; Example 3. IP packet parsing. 
 ;
-
-(use bitstring srfi-4)
 
 (define IPRaw `#u8( #x45 #x00 #x00 #x6c
         #x92 #xcc #x00 #x00
