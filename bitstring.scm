@@ -64,6 +64,7 @@
         srfi-1
         srfi-4
         bitstring-lowlevel)
+      (import-for-syntax srfi-1)
       (define bit-set? bit->boolean)))
 
 (define-syntax symbol??

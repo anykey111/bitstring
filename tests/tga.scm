@@ -3,7 +3,10 @@
 ; Support True-Image type format and Run-Length-Encoding compression.
 ; SPEC: http://www.dca.fee.unicamp.br/~martino/disciplinas/ea978/tgaffs.pdf
 
-(use bitstring posix srfi-4)
+(import scheme)
+(cond-expand
+ (chicken-4 (use bitstring posix srfi-4))
+ (chicken-5 (import bitstring (chicken file posix) srfi-4)))
 
 (bitpacket TGA-Header
   (ID-length 8)
