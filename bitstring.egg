@@ -5,6 +5,7 @@
  (author "rivo")
  (synopsis "Binary pattern matching")
  (components (extension bitstring
-                        (csc-options -O3 -d1))
+                        (csc-options -O3 -d1)
+                        (component-dependencies bitstring-lowlevel))
              (extension bitstring-lowlevel
                         (csc-options -O3 -d1))))
